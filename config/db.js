@@ -1,12 +1,9 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
-import setupDNS from "./dns.js";
-setupDNS();
-dotenv.config();
+import keys from "./keys.js";
 
 export const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI);
+        await mongoose.connect(keys.mongoUri);
         console.log("MongoDB connected");
     } catch (error) {
         console.error("Error connecting to MongoDB:", error.message);
