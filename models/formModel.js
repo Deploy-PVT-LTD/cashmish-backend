@@ -17,13 +17,18 @@ const fromSchema = new mongoose.Schema({
        images:{
         type:String
      },
+     brand:{
+         type:String,
+         enum:['Apple','Samsung'],
+         required:true
+     },
         phoneModel:{
         type:String,
         required:true
      },
        condition:{
         type:String,
-        Enum:['new','like new','used','refurbished'],
+        enum:['new','like new','used','refurbished'],
         required:true
        },
        storage:{
