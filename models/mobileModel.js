@@ -14,7 +14,7 @@ const mobileSchema = new mongoose.Schema({
         type:Number,
         required:true
     },
-    pictureUrl:{
+    image:{
         type:String
     },
     isActive:{
