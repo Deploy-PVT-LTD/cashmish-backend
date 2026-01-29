@@ -22,7 +22,8 @@ const formSchema = new mongoose.Schema(
      
     carrier: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
     screenCondition: {
       type: String,
