@@ -1,6 +1,6 @@
 import { Mobile } from "../models/mobileModel.js";
 
-//Add a new mobile phone
+// 1. Add a new mobile phone
 export const addMobile = async (req, res) => {
     try {
         const { brand, phoneModel, basePrice } = req.body;
@@ -10,8 +10,9 @@ export const addMobile = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Server Error", error: error.message });
     }
-}
-//Get all mobile phones
+};
+
+// 2. Get all mobile phones
 export const getMobiles = async (req, res) => {
     try {
         const mobiles = await Mobile.find();
@@ -19,8 +20,9 @@ export const getMobiles = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Server Error", error: error.message });
     }
-}
-//Get a mobile phone by ID
+};
+
+// 3. Get a mobile phone by ID
 export const getMobileById = async (req, res) => {
     try {
         const mobile = await Mobile.findById(req.params.id);
@@ -31,27 +33,29 @@ export const getMobileById = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Server Error", error: error.message });
     }
-}
-//get a mobile phone by brand and model
+};
+
 export const getMobilesByBrand = async (req, res) => {
   try {
     const { brand } = req.query;
+    console.log("Searching for brand:", brand);
 
     if (!brand) {
       return res.status(400).json({ message: "Brand is required" });
     }
 
     const mobiles = await Mobile.find({
-      brand,
-      isActive: true
-    });
+      brand: { $regex: new RegExp(`^${brand}$`, 'i') }
+    }).select("phoneModel _id"); 
 
-    res.json(mobiles);
+    res.status(200).json(mobiles);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch mobiles" });
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
-//Update a mobile phone
+
+
+// 5. Update a mobile phone
 export const updateMobile = async (req, res) => {
     try {
         const { brand, phoneModel, basePrice, isActive } = req.body;
@@ -67,8 +71,9 @@ export const updateMobile = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Server Error", error: error.message });
     }
-}
-//Delete a mobile phone
+};
+
+// 6. Delete a mobile phone
 export const deleteMobile = async (req, res) => {
     try {
         const mobile = await Mobile.findByIdAndDelete(req.params.id);
@@ -79,5 +84,4 @@ export const deleteMobile = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Server Error", error: error.message });
     }
-}
-
+};
