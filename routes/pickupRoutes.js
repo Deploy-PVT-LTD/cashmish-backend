@@ -1,5 +1,5 @@
 import express from "express";
-import { createPickUpDetails, getAllPickUpDetails, getPickUpDetailsById, deletePickUpDetails, updatePickUpDetails } from "../controllers/pickUpController";
+import { createPickUpDetails, getAllPickUpDetails, getPickUpDetailsById, deletePickUpDetails, updatePickUpDetails } from "../controllers/pickupController.js";
 
 const router = express.Router();
 router.post("/", createPickUpDetails);
