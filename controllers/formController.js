@@ -2,11 +2,12 @@ import { Form } from "../models/formModel.js";
 import { Mobile } from "../models/mobileModel.js";
 import cloudinary from "../config/cloudinary.js";
 import { calculatePrice } from "../utils/priceCalculator.js";
+import streamifier from "streamifier";
 
 //form controllers
 export const createForm = async (req, res) => {
   try {
-    const {
+    let {
       userId,
       mobileId,
       storage,
@@ -16,6 +17,10 @@ export const createForm = async (req, res) => {
       batteryCondition,
       pickUpDetails
     } = req.body;
+
+ if (typeof pickUpDetails === "string") {
+      pickUpDetails = JSON.parse(pickUpDetails.trim());
+    }
 
     if (!mobileId || !pickUpDetails) {
       return res.status(400).json({ message: "Required fields missing" });
@@ -27,15 +32,25 @@ export const createForm = async (req, res) => {
     }
 
     /* upload images */
-    const imageUrls = [];
-    if (req.files?.length) {
-      for (const file of req.files) {
-        const uploaded = await cloudinary.uploader.upload(file.path, {
-          folder: "reseller_forms"
-        });
-        imageUrls.push(uploaded.secure_url);
-      }
-    }
+   const imageUrls = [];
+
+if (req.files && req.files.length > 0) {
+  for (const file of req.files) {
+    const uploaded = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "reseller_forms" },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+
+      streamifier.createReadStream(file.buffer).pipe(stream);
+    });
+
+    imageUrls.push(uploaded.secure_url);
+  }
+}
 
     /* calculate price */
     const estimatedPrice = calculatePrice(mobile.basePrice, {
@@ -60,8 +75,14 @@ export const createForm = async (req, res) => {
 
     res.status(201).json(form);
   } catch (error) {
-    res.status(500).json({ message: "Form creation failed" });
-  }
+  console.error("CREATE FORM ERROR 👉", error);
+  res.status(500).json({
+    message: "Form creation failed",
+    error: error.message,
+    stack: error.stack
+  });
+}
+
 };
 
 //get all forms
