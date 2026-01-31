@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import passportConfig from './config/passport.js';
 import mobileRoutes from './routes/mobileRoute.js';
 import formRoutes from './routes/formRoutes.js';
+import pickupRoutes from './routes/pickupRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,6 +30,7 @@ app.get('/', (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/mobiles", mobileRoutes);
 app.use("/api/forms", formRoutes);
+app.use("/api/pickup", pickupRoutes);
 
 //connect to database and start server
 connectDB();
