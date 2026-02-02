@@ -1,6 +1,6 @@
 import express from "express";
 import passport from "passport";
-import { signup, login } from "../controllers/authController.js";
+import { signup, login, getUsers, getUserById, updateUserRole, deleteUser } from "../controllers/authController.js";
 import jwt from "jsonwebtoken";
 import keys from "../config/keys.js";
 
@@ -9,6 +9,10 @@ const router = express.Router();
 //local route
 router.post("/signup", signup);
 router.post("/login", login);
+router.put("/:id/role", updateUserRole);
+router.get("/", getUsers);
+router.get("/:id", getUserById);
+router.delete("/:id", deleteUser);
 
 // Google OAuth routes
 router.get(
