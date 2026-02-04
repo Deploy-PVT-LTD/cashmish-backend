@@ -90,6 +90,10 @@ const formSchema = new mongoose.Schema(
       type: Number,
     },
 
+    bidPrice: {
+      type: Number,
+      default: 0,
+    },
     status: {
       type: String,
       default: "pending",

@@ -131,7 +131,8 @@ export const updateForm = async (req, res) => {
       "bodyCondition",
       "batteryCondition",
       "pickUpDetails",
-      "status"
+      "status",
+      "bidPrice"
     ];
 
     allowedFields.forEach(field => {
