@@ -26,6 +26,15 @@ const inventorySchema = new mongoose.Schema({
         enum:["New","Like New","Good","Fair","Poor"],
         required:true
     },
+    salePrice:{
+        type:Number
+    },
+    saleDate:{
+        type:Date
+    },
+    buyer:{
+        type:String
+    },
     source:{
         type:String,
         required:true
