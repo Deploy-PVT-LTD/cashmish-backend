@@ -3,7 +3,7 @@ import { Inventory } from "../models/inventoryModel.js";
 // Create inventory item
 export const createInventoryItem = async (req, res) => {
   try {
-    const { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status } = req.body;
+    const { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status, salePrice, saleDate, buyer } = req.body;
     const inventoryItem = await Inventory.create({
       phoneModel,
         storage,
@@ -13,7 +13,10 @@ export const createInventoryItem = async (req, res) => {
         source,
         notes,
         imeiNumber,
-        status
+        status,
+        salePrice,
+        saleDate,
+        buyer
     });
     
     res.status(201).json(inventoryItem);
@@ -45,10 +48,10 @@ export const getInventoryItemById = async (req, res) => {
 // Update inventory item by ID
 export const updateInventoryItemById = async (req, res) => {
     try {
-        const { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status } = req.body;
+        const { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status, salePrice, saleDate, buyer } = req.body;
         const inventoryItem = await Inventory.findByIdAndUpdate(
             req.params.id,
-            { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status },
+            { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status, salePrice, saleDate, buyer },
             { new: true },
         );
         if (!inventoryItem) {
