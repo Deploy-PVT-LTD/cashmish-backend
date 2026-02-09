@@ -3,7 +3,7 @@ import { Inventory } from "../models/inventoryModel.js";
 // Create inventory item
 export const createInventoryItem = async (req, res) => {
   try {
-    const { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes } = req.body;
+    const { phoneModel, storage, purchasePrice, purchaseDate, condition, source, notes, imeiNumber, status } = req.body;
     const inventoryItem = await Inventory.create({
       phoneModel,
         storage,
@@ -12,7 +12,8 @@ export const createInventoryItem = async (req, res) => {
         condition,
         source,
         notes,
-        imeiNumber
+        imeiNumber,
+        status
     });
     
     res.status(201).json(inventoryItem);
