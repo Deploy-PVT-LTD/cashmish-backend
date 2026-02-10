@@ -4,13 +4,14 @@ import { Mobile } from "../models/mobileModel.js";
 
 export const addMobile = async (req, res) => {
   try {
-    const { brand, phoneModel, basePrice, image } = req.body;
+    const { brand, phoneModel, basePrice, image, deductionRules } = req.body;
 
     const mobile = await Mobile.create({
       brand,
       phoneModel,
       basePrice,
-      image
+      image,
+      deductionRules
     });
 
     res.status(201).json(mobile);
@@ -69,7 +70,7 @@ export const getMobilesByBrand = async (req, res) => {
 export const updateMobile = async (req, res) => {
   try {
     const updates = {};
-    const fields = ["brand", "phoneModel", "basePrice", "isActive", "image"];
+    const fields = ["brand", "phoneModel", "basePrice", "isActive", "image", "deductionRules"];
 
     fields.forEach(field => {
       if (req.body[field] !== undefined) {

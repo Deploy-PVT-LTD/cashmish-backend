@@ -2,14 +2,15 @@
  * Calculate estimated mobile price based on conditions
  * @param {Number} basePrice - mobile base price from DB
  * @param {Object} conditions - phone condition object
+ * @param {Object} [rules] - optional deduction rules
  * @returns {Number} final estimated price
  */
 
-export const calculatePrice = (basePrice, conditions) => {
+export const calculatePrice = (basePrice, conditions, rules) => {
   if (!basePrice || !conditions) return 0;
 
   // deduction rules (percentage)
-  const rules = {
+  const defaultRules = {
     screen: {
       perfect: 0,
       scratched: 10,
@@ -27,18 +28,20 @@ export const calculatePrice = (basePrice, conditions) => {
     }
   };
 
+  const useRules = rules || defaultRules;
+
   let totalDeductionPercent = 0;
 
-  if (conditions.screen && rules.screen[conditions.screen] !== undefined) {
-    totalDeductionPercent += rules.screen[conditions.screen];
+  if (conditions.screen && useRules.screen[conditions.screen] !== undefined) {
+    totalDeductionPercent += useRules.screen[conditions.screen];
   }
 
-  if (conditions.body && rules.body[conditions.body] !== undefined) {
-    totalDeductionPercent += rules.body[conditions.body];
+  if (conditions.body && useRules.body[conditions.body] !== undefined) {
+    totalDeductionPercent += useRules.body[conditions.body];
   }
 
-  if (conditions.battery && rules.battery[conditions.battery] !== undefined) {
-    totalDeductionPercent += rules.battery[conditions.battery];
+  if (conditions.battery && useRules.battery[conditions.battery] !== undefined) {
+    totalDeductionPercent += useRules.battery[conditions.battery];
   }
 
   // max limit (optional safety)

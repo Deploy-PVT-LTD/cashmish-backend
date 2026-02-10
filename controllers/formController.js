@@ -4,6 +4,8 @@ import cloudinary from "../config/cloudinary.js";
 import { calculatePrice } from "../utils/priceCalculator.js";
 import streamifier from "streamifier";
 
+import { PriceConfig } from "../models/priceConfigModel.js";
+
 //form controllers
 export const createForm = async (req, res) => {
   try {
@@ -18,7 +20,7 @@ export const createForm = async (req, res) => {
       pickUpDetails
     } = req.body;
 
- if (typeof pickUpDetails === "string") {
+    if (typeof pickUpDetails === "string") {
       pickUpDetails = JSON.parse(pickUpDetails.trim());
     }
 
@@ -32,25 +34,37 @@ export const createForm = async (req, res) => {
     }
 
     /* upload images */
-   const imageUrls = [];
+    const imageUrls = [];
 
-if (req.files && req.files.length > 0) {
-  for (const file of req.files) {
-    const uploaded = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: "reseller_forms" },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const uploaded = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "reseller_forms" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
 
-      streamifier.createReadStream(file.buffer).pipe(stream);
-    });
+          streamifier.createReadStream(file.buffer).pipe(stream);
+        });
 
-    imageUrls.push(uploaded.secure_url);
-  }
-}
+        imageUrls.push(uploaded.secure_url);
+      }
+    }
+
+    /* determine effective rules (global + mobile overrides) */
+    let globalRules = await PriceConfig.findOne();
+    let effectiveRules = globalRules ? JSON.parse(JSON.stringify(globalRules)) : undefined;
+
+    if (mobile.deductionRules) {
+      if (!effectiveRules) effectiveRules = {};
+
+      if (mobile.deductionRules.screen) effectiveRules.screen = { ...effectiveRules.screen, ...mobile.deductionRules.screen };
+      if (mobile.deductionRules.body) effectiveRules.body = { ...effectiveRules.body, ...mobile.deductionRules.body };
+      if (mobile.deductionRules.battery) effectiveRules.battery = { ...effectiveRules.battery, ...mobile.deductionRules.battery };
+    }
 
     /* calculate price */
     const estimatedPrice = calculatePrice(mobile.basePrice, {
@@ -58,7 +72,7 @@ if (req.files && req.files.length > 0) {
       screen: screenCondition,
       body: bodyCondition,
       battery: batteryCondition
-    });
+    }, effectiveRules);
 
     const form = await Form.create({
       userId,
@@ -75,13 +89,13 @@ if (req.files && req.files.length > 0) {
 
     res.status(201).json(form);
   } catch (error) {
-  console.error("CREATE FORM ERROR 👉", error);
-  res.status(500).json({
-    message: "Form creation failed",
-    error: error.message,
-    stack: error.stack
-  });
-}
+    console.error("CREATE FORM ERROR 👉", error);
+    res.status(500).json({
+      message: "Form creation failed",
+      error: error.message,
+      stack: error.stack
+    });
+  }
 
 };
 
@@ -149,12 +163,23 @@ export const updateForm = async (req, res) => {
       req.body.batteryCondition
     ) {
       const mobile = await Mobile.findById(form.mobileId);
+      let globalRules = await PriceConfig.findOne();
+
+      let effectiveRules = globalRules ? JSON.parse(JSON.stringify(globalRules)) : undefined;
+
+      if (mobile.deductionRules) {
+        if (!effectiveRules) effectiveRules = {};
+        if (mobile.deductionRules.screen) effectiveRules.screen = { ...effectiveRules.screen, ...mobile.deductionRules.screen };
+        if (mobile.deductionRules.body) effectiveRules.body = { ...effectiveRules.body, ...mobile.deductionRules.body };
+        if (mobile.deductionRules.battery) effectiveRules.battery = { ...effectiveRules.battery, ...mobile.deductionRules.battery };
+      }
+
       form.estimatedPrice = calculatePrice(mobile.basePrice, {
         storage: form.storage,
         screen: form.screenCondition,
         body: form.bodyCondition,
         battery: form.batteryCondition
-      });
+      }, effectiveRules);
     }
 
     await form.save();

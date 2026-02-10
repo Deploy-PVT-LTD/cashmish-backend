@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import { connectDB } from './config/db.js';
@@ -11,6 +10,7 @@ import formRoutes from './routes/formRoutes.js';
 import pickupRoutes from './routes/pickupRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
+import priceConfigRoutes from './routes/priceConfigRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +35,7 @@ app.use("/api/forms", formRoutes);
 app.use("/api/pickup", pickupRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/price-config", priceConfigRoutes);
 
 //connect to database and start server
 connectDB();
