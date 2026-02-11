@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
     email: {type: String, required: true, unique: true},
     password: {type: String, required: true},
     googleId: {type: String},
-    role: {type: String, enum: ['user', 'admin', 'moderator', 'superadmin'], default: 'user'},
+    role: {type: String, enum: ['user', 'admin', 'accountant', 'superadmin'], default: 'user'},
 },{timestamps:true});
 
 export const User = mongoose.model('User', userSchema);

@@ -23,6 +23,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Logging Middleware
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  console.log('Auth Header:', req.headers.authorization);
+  next();
+});
 
 app.get('/', (req, res) => {
   res.send('Welcome to the Reseller Backend API');

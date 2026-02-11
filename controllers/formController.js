@@ -1,5 +1,7 @@
 import { Form } from "../models/formModel.js";
 import { Mobile } from "../models/mobileModel.js";
+import { User } from "../models/userModel.js";
+import { Inventory } from "../models/inventoryModel.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { PriceConfig } from "../models/priceConfigModel.js";
@@ -212,5 +214,108 @@ export const getFormById = async (req, res) => {
   } catch (error) {
     console.error("❌ Get form error:", error);
     res.status(500).json({ message: "Fetch failed", error: error.message });
+  }
+};
+
+// get dashboard stats
+export const getDashboardStats = async (req, res) => {
+  try {
+    // 1. Basic Counts
+    const totalSubmissions = await Form.countDocuments();
+    const pendingOrders = await Form.countDocuments({ status: 'pending' });
+    const acceptedDeals = await Form.countDocuments({ status: 'accepted' });
+    const rejectedDeals = await Form.countDocuments({ status: 'rejected' });
+    const totalUsers = await User.countDocuments();
+
+    // 2. Total Purchase (Sum of bidPrice for accepted forms)
+    const purchaseAgg = await Form.aggregate([
+      { $match: { status: 'accepted' } },
+      { $group: { _id: null, total: { $sum: "$bidPrice" } } }
+    ]);
+    const totalPurchase = purchaseAgg.length > 0 ? purchaseAgg[0].total : 0;
+
+    // 3. Total Sale (Sum of salePrice for sold inventory)
+    const saleAgg = await Inventory.aggregate([
+      { $match: { status: 'Sold' } },
+      { $group: { _id: null, total: { $sum: "$salePrice" } } }
+    ]);
+    const totalSale = saleAgg.length > 0 ? saleAgg[0].total : 0;
+
+    // 4. Submissions Chart Data (Group by Month)
+    const currentYear = new Date().getFullYear();
+    const chartAgg = await Form.aggregate([
+      {
+        $project: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" } // 1-12
+        }
+      },
+      { $match: { year: currentYear } },
+      {
+        $group: {
+          _id: "$month",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const chartData = months.map((month, index) => {
+      const found = chartAgg.find(item => item._id === index + 1);
+      return {
+        name: month,
+        submissions: found ? found.count : 0
+      };
+    });
+
+    // 5. Brand Chart Data (Join with Mobile to get Brand)
+    const brandAgg = await Form.aggregate([
+      {
+        $lookup: {
+          from: "mobiles",
+          localField: "mobileId",
+          foreignField: "_id",
+          as: "mobile"
+        }
+      },
+      { $unwind: "$mobile" },
+      {
+        $group: {
+          _id: "$mobile.brand",
+          value: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const brandData = brandAgg.map(item => ({
+      name: item._id || 'Unknown',
+      value: item.value
+    }));
+
+    // 6. Recent Submissions (Top 5)
+    // Populate mobileId to get brand and model
+    const recentSubmissions = await Form.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('mobileId', 'brand phoneModel')
+      .lean();
+
+    res.json({
+      totalSubmissions,
+      pendingOrders,
+      acceptedDeals,
+      rejectedDeals,
+      totalUsers,
+      totalPurchase,
+      totalSale,
+      chartData,
+      brandData,
+      recentSubmissions
+    });
+
+  } catch (error) {
+    console.error("Dashboard Stats Error:", error);
+    res.status(500).json({ message: "Server error fetching dashboard stats" });
   }
 };
