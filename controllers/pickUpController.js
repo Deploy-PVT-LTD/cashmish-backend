@@ -2,10 +2,11 @@ import { PickUpDetails } from "../models/pickupModel.js";
 
 export const createPickUpDetails = async (req, res) => {
   try {
-    const { fullName, phoneNumber, address, pickUpDate, timeSlot } = req.body;
+    const { fullName, phoneNumber, email, address, pickUpDate, timeSlot } = req.body;
     const newPickUpDetails = new PickUpDetails({
       fullName,
       phoneNumber,
+      email,
         address,
         pickUpDate,
         timeSlot
