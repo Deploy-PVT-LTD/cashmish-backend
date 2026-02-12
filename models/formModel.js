@@ -11,7 +11,7 @@ const formSchema = new mongoose.Schema(
     pickUpDetails: {
       fullName: { type: String, required: true },
       phoneNumber: { type: String, required: true },
-
+      email: { type: String, required: true },
       address: {
         addressText: { type: String, required: true },
         location: {
