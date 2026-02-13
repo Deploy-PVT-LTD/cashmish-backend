@@ -7,6 +7,8 @@ import {
   getUserById,
   updateUserRole,
   deleteUser,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/authController.js";
 import jwt from "jsonwebtoken";
 import keys from "../config/keys.js";
@@ -48,5 +50,7 @@ router.put("/:id", updateUserRole);
 router.get("/", getUsers);
 router.get("/:id", getUserById);
 router.delete("/:id", deleteUser);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
 
 export default router;

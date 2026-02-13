@@ -9,5 +9,7 @@ export default {
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
     googleCallbackURL: process.env.GOOGLE_CALLBACK_URL,
+    emailUser: process.env.EMAIL_USER,
+    emailPass: process.env.EMAIL_PASS,
     port: process.env.PORT || 5000,
 }
