@@ -6,7 +6,13 @@ import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { PriceConfig } from "../models/priceConfigModel.js";
 import { calculatePrice } from "../utils/priceCalculator.js";
-import { sendEmail, getFormConfirmationTemplate } from "../utils/emailService.js";
+import {
+  sendEmail,
+  getFormConfirmationTemplate,
+  getBidStatusTemplate,
+  getAdminBidOfferTemplate,
+  getAcceptPriceTemplate
+} from "../utils/emailService.js";
 
 export const createForm = async (req, res) => {
   try {
@@ -241,6 +247,7 @@ export const updateForm = async (req, res) => {
     if (!form) return res.status(404).json({ message: "Form not found" });
 
     const oldStatus = form.status;
+    const oldBidPrice = form.bidPrice;
 
     // Update status
     if (req.body.status) {
@@ -258,12 +265,51 @@ export const updateForm = async (req, res) => {
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    console.log("✏️ Form updated:", {
-      id: form._id,
-      oldStatus,
-      newStatus: form.status,
-      bidPrice: form.bidPrice
-    });
+    // Send refined email notifications
+    const statusChanged = req.body.status && req.body.status !== oldStatus;
+    const bidUpdated = req.body.bidPrice !== undefined && Number(req.body.bidPrice) !== Number(oldBidPrice);
+
+    if (statusChanged || bidUpdated) {
+      try {
+        let html = '';
+        let subject = '';
+
+        if (bidUpdated && (!req.body.status || req.body.status === 'pending' || req.body.status === 'bid_placed')) {
+          subject = 'New Bid Offer for Your Device - CashMish';
+          html = getAdminBidOfferTemplate(
+            form.pickUpDetails.fullName,
+            `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+            form.bidPrice,
+            form._id
+          );
+        } else if (req.body.status === 'accepted' && statusChanged) {
+          subject = 'Trade-in Price Accepted - CashMish';
+          html = getAcceptPriceTemplate(
+            form.pickUpDetails.fullName,
+            `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+            form.bidPrice || form.estimatedPrice
+          );
+        } else if (req.body.status === 'rejected' && statusChanged) {
+          subject = 'Trade-in Request Status Update - CashMish';
+          html = getBidStatusTemplate(
+            form.pickUpDetails.fullName,
+            `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+            'rejected',
+            0
+          );
+        }
+
+        if (html && subject) {
+          await sendEmail({
+            email: form.pickUpDetails.email,
+            subject,
+            html,
+          });
+        }
+      } catch (emailError) {
+        console.error("❌ Email sending failure:", emailError.message);
+      }
+    }
 
     res.json(form);
   } catch (error) {

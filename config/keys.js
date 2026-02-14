@@ -3,11 +3,6 @@ import setupDNS from './dns.js';
 setupDNS();
 dotenv.config();
 
-console.log("Email Config Check:", {
-    EMAIL_USER: process.env.EMAIL_USER ? "FOUND" : "NOT FOUND",
-    EMAIL_PASS: process.env.EMAIL_PASS ? "FOUND" : "NOT FOUND"
-});
-
 export default {
     mongoUri: process.env.MONGODB_URI,
     jwtSecret: process.env.JWT_SECRET,
