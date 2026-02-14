@@ -117,10 +117,30 @@ export const createForm = async (req, res) => {
     }
 
     const form = await Form.create(formData);
-    
+
     // Populate mobile details before sending response
     await form.populate('mobileId');
-    
+
+    // Send confirmation email
+    try {
+      const { sendEmail, getFormConfirmationTemplate } = await import("../utils/emailService.js");
+      const html = getFormConfirmationTemplate(
+        form.pickUpDetails.fullName,
+        `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+        form.estimatedPrice
+      );
+
+      await sendEmail({
+        email: form.pickUpDetails.email,
+        subject: 'Form Submission Confirmation - CashMish',
+        html,
+      });
+      console.log("📧 Confirmation email sent to:", form.pickUpDetails.email);
+    } catch (emailError) {
+      console.error("❌ Failed to send confirmation email:", emailError.message);
+      // We don't fail the request if email fails
+    }
+
     console.log("📝 Form created:", {
       id: form._id,
       userId: form.userId,
@@ -136,6 +156,68 @@ export const createForm = async (req, res) => {
     res.status(500).json({ message: "Form creation failed", error: error.message });
   }
 };
+
+export const getEstimate = async (req, res) => {
+  try {
+    const {
+      mobileId,
+      storage,
+      screenCondition,
+      bodyCondition,
+      batteryCondition,
+    } = req.body;
+
+    if (!mobileId) {
+      return res.status(400).json({ message: "Mobile ID is required" });
+    }
+
+    const mobile = await Mobile.findById(mobileId);
+    if (!mobile) return res.status(404).json({ message: "Mobile not found" });
+
+    // Get pricing rules
+    let globalRules = await PriceConfig.findOne();
+    let effectiveRules = globalRules
+      ? JSON.parse(JSON.stringify(globalRules))
+      : {};
+
+    // Apply mobile-specific deduction rules
+    if (mobile.deductionRules) {
+      if (mobile.deductionRules.screen)
+        effectiveRules.screen = {
+          ...effectiveRules.screen,
+          ...mobile.deductionRules.screen,
+        };
+      if (mobile.deductionRules.body)
+        effectiveRules.body = {
+          ...effectiveRules.body,
+          ...mobile.deductionRules.body,
+        };
+      if (mobile.deductionRules.battery)
+        effectiveRules.battery = {
+          ...effectiveRules.battery,
+          ...mobile.deductionRules.battery,
+        };
+    }
+
+    // Calculate estimated price
+    const estimatedPrice = calculatePrice(
+      mobile.basePrice,
+      {
+        storage,
+        screen: screenCondition,
+        body: bodyCondition,
+        battery: batteryCondition,
+      },
+      effectiveRules
+    );
+
+    res.json({ estimatedPrice });
+  } catch (error) {
+    console.error("❌ Estimate calculation error:", error);
+    res.status(500).json({ message: "Estimate calculation failed", error: error.message });
+  }
+};
+
 
 export const getAllForms = async (req, res) => {
   try {
@@ -171,7 +253,7 @@ export const updateForm = async (req, res) => {
     }
 
     await form.save();
-    
+
     // Populate before sending response
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
