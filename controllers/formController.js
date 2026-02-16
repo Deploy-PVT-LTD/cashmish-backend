@@ -120,7 +120,6 @@ export const createForm = async (req, res) => {
       console.log("✅ LOGGED-IN USER - userId from body:", userId);
     } else {
       formData.userId = null;
-      console.log("👤 GUEST USER - No userId");
     }
 
     const form = await Form.create(formData);
@@ -128,7 +127,7 @@ export const createForm = async (req, res) => {
     // Populate mobile details before sending response
     await form.populate('mobileId');
 
-    // Send confirmation email
+    // Send confirmation email (Non-blocking)
     try {
       const html = getFormConfirmationTemplate(
         form.pickUpDetails.fullName,
@@ -136,25 +135,14 @@ export const createForm = async (req, res) => {
         form.estimatedPrice
       );
 
-      await sendEmail({
+      sendEmail({
         email: form.pickUpDetails.email,
         subject: 'Form Submission Confirmation - CashMish',
         html,
-      });
-      console.log("📧 Confirmation email sent to:", form.pickUpDetails.email);
-    } catch (emailError) {
-      console.error("❌ Failed to send confirmation email:", emailError.message);
-      // We don't fail the request if email fails
+      }).catch(err => console.error("📧 Non-blocking email error (Confirmation):", err.message));
+    } catch (error) {
+      // Silent error for email template generation
     }
-
-    console.log("📝 Form created:", {
-      id: form._id,
-      userId: form.userId,
-      phoneNumber: form.pickUpDetails?.phoneNumber,
-      isGuest: !form.userId,
-      status: form.status,
-      bidPrice: form.bidPrice
-    });
 
     res.status(201).json(form);
   } catch (error) {
@@ -300,14 +288,14 @@ export const updateForm = async (req, res) => {
         }
 
         if (html && subject) {
-          await sendEmail({
+          sendEmail({
             email: form.pickUpDetails.email,
             subject,
             html,
-          });
+          }).catch(err => console.error("📧 Non-blocking email error (Update):", err.message));
         }
       } catch (emailError) {
-        console.error("❌ Email sending failure:", emailError.message);
+        // Silent error for email template generation
       }
     }
 
