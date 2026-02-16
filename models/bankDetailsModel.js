@@ -17,6 +17,11 @@ const bankDetailsSchema = new mongoose.Schema({
     bankName: {
         type: String,
         required: true
+    },
+    status: {
+        type: String,
+        enum: ["pending", "paid", "rejected"],
+        default: "pending"
     }
 }, { timestamps: true })
 
