@@ -1,3 +1,4 @@
+import express from "express";
 import { addBankDetails, getBankDetails, updateBankDetails, deleteBankDetails, getBankDetailsByUserId } from "../controllers/bankDetailsController.js";
 
 const router = express.Router();
