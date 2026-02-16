@@ -11,6 +11,7 @@ import pickupRoutes from './routes/pickupRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import priceConfigRoutes from './routes/priceConfigRoutes.js';
+import bankDetailsRoutes from './routes/bankDetailsRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use("/api/pickup", pickupRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/price-config", priceConfigRoutes);
+app.use("/api/bankDetails", bankDetailsRoutes);
 
 //connect to database and start server
 connectDB();
