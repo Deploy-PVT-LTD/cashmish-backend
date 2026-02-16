@@ -13,7 +13,7 @@ export const addBankDetails = async (req, res) => {
 //get all bank details
 export const getBankDetails = async (req, res) => {
     try {
-        const bankDetails = await BankDetails.find();
+        const bankDetails = await BankDetails.find().populate("userId", "name email");
         res.status(200).json(bankDetails);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -23,8 +23,17 @@ export const getBankDetails = async (req, res) => {
 //update bank details
 export const updateBankDetails = async (req, res) => {
     try {
+        const { id } = req.params;
         const { userId, accountNumber, accountHolderName, bankName, status } = req.body;
-        const bankDetails = await BankDetails.findOneAndUpdate({ userId }, { userId, accountNumber, accountHolderName, bankName, status });
+
+        const updateData = {};
+        if (userId) updateData.userId = userId;
+        if (accountNumber) updateData.accountNumber = accountNumber;
+        if (accountHolderName) updateData.accountHolderName = accountHolderName;
+        if (bankName) updateData.bankName = bankName;
+        if (status) updateData.status = status;
+
+        const bankDetails = await BankDetails.findByIdAndUpdate(id, updateData, { new: true });
         res.status(200).json(bankDetails);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -34,9 +43,9 @@ export const updateBankDetails = async (req, res) => {
 //delete bank details
 export const deleteBankDetails = async (req, res) => {
     try {
-        const { userId } = req.body;
-        const bankDetails = await BankDetails.findOneAndDelete({ userId });
-        res.status(200).json(bankDetails);
+        const { id } = req.params;
+        const bankDetails = await BankDetails.findByIdAndDelete(id);
+        res.status(200).json({ message: "Bank details deleted successfully", bankDetails });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
