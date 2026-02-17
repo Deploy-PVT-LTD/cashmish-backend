@@ -4,7 +4,7 @@ import auth from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", auth, addBankDetails);
+router.post("/", addBankDetails);
 router.get("/", auth, getBankDetails);
 router.put("/:id", auth, updateBankDetails);
 router.delete("/:id", auth, deleteBankDetails);
