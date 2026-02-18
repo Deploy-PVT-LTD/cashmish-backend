@@ -6,6 +6,7 @@ import {
   getFormById,
   deleteForm,
   getWalletBalance,
+  getGuestWalletBalance,
   getDashboardStats,
   getEstimate,
   bridgeGuestOrders,
@@ -20,6 +21,7 @@ router.post("/estimate", getEstimate);
 router.post("/", upload.array("images", 5), createForm);
 router.get("/", getAllForms);
 router.get("/wallet-balance/:userId", getWalletBalance);
+router.post("/guest-balance", getGuestWalletBalance);
 router.post("/bridge", bridgeGuestOrders);
 router.get("/:id", getFormById);
 router.put("/:id", updateForm);

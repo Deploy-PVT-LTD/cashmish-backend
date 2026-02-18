@@ -5,8 +5,8 @@ import { Form } from "../models/formModel.js";
 //add bank details
 export const addBankDetails = async (req, res) => {
     try {
-        const { userId, accountNumber, accountHolderName, bankName, status } = req.body;
-        const bankDetails = await BankDetails.create({ userId, accountNumber, accountHolderName, bankName, status });
+        const { userId, accountNumber, accountHolderName, bankName, amount, status } = req.body;
+        const bankDetails = await BankDetails.create({ userId, accountNumber, accountHolderName, bankName, amount, status });
 
         // ✅ Reset Wallet Balance in DB
         await Wallet.findOneAndUpdate(
@@ -70,8 +70,8 @@ export const deleteBankDetails = async (req, res) => {
 //get bank details by user id
 export const getBankDetailsByUserId = async (req, res) => {
     try {
-        const { userId } = req.body;
-        const bankDetails = await BankDetails.findOne({ userId });
+        const { userId } = req.params;
+        const bankDetails = await BankDetails.find({ userId }).sort({ createdAt: -1 });
         res.status(200).json(bankDetails);
     } catch (error) {
         res.status(500).json({ error: error.message });

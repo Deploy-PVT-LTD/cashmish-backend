@@ -450,7 +450,7 @@ export const getDashboardStats = async (req, res) => {
     res.status(500).json({ message: "Server error fetching dashboard stats" });
   }
 };
-// ── WALLET BALANCE API ─────────────────────────────────────
+// ── WALLET BALANCE API (Truth from Forms) ──────────────────────────────────
 export const getWalletBalance = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -459,17 +459,56 @@ export const getWalletBalance = async (req, res) => {
       return res.status(400).json({ message: "User ID required" });
     }
 
-    const wallet = await Wallet.findOne({ userId });
+    // 1. Find all forms with status 'accepted' for this user
+    const acceptedForms = await Form.find({ userId, status: "accepted" });
+    const realBalance = acceptedForms.reduce((sum, f) => sum + (parseFloat(f.bidPrice) || 0), 0);
 
+    // 2. Sync Wallet document (Ensures it's never out of sync)
+    const wallet = await Wallet.findOneAndUpdate(
+      { userId },
+      { $set: { balance: realBalance } },
+      { upsert: true, new: true }
+    );
+
+    // Return the verified balance and pending order IDs
     res.json({
-      balance: wallet ? wallet.balance : 0,
-      totalEarnings: wallet ? wallet.totalEarnings : 0,
-      totalWithdrawn: wallet ? wallet.totalWithdrawn : 0
+      balance: wallet.balance,
+      totalEarnings: wallet.totalEarnings,
+      totalWithdrawn: wallet.totalWithdrawn,
+      pendingActions: acceptedForms.map(f => ({ orderId: f._id, amount: f.bidPrice }))
     });
 
   } catch (error) {
     console.error("❌ Wallet Balance Error:", error);
     res.status(500).json({ message: "Wallet fetch failed" });
+  }
+};
+
+// ── GUEST WALLET BALANCE (For LocalStorage persistence) ─────────────────────
+export const getGuestWalletBalance = async (req, res) => {
+  try {
+    const { orderIds } = req.body;
+
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(200).json({ balance: 0, pendingActions: [] });
+    }
+
+    // Find accepted guest forms
+    const acceptedForms = await Form.find({
+      _id: { $in: orderIds },
+      status: "accepted"
+    });
+
+    const balance = acceptedForms.reduce((sum, f) => sum + (parseFloat(f.bidPrice) || 0), 0);
+
+    res.json({
+      balance,
+      pendingActions: acceptedForms.map(f => ({ orderId: f._id, amount: f.bidPrice }))
+    });
+
+  } catch (error) {
+    console.error("❌ Guest Wallet Error:", error);
+    res.status(500).json({ message: "Guest balance fetch failed" });
   }
 };
 
