@@ -1,10 +1,26 @@
 import { BankDetails } from "../models/bankDetailsModel.js";
+import { Wallet } from "../models/walletModel.js";
+import { Form } from "../models/formModel.js";
 
 //add bank details
 export const addBankDetails = async (req, res) => {
     try {
         const { userId, accountNumber, accountHolderName, bankName, status } = req.body;
         const bankDetails = await BankDetails.create({ userId, accountNumber, accountHolderName, bankName, status });
+
+        // ✅ Reset Wallet Balance in DB
+        await Wallet.findOneAndUpdate(
+            { userId },
+            { $set: { balance: 0 }, $inc: { totalWithdrawn: 0 } }, // totalWithdrawn logic can be refined later if needed
+            { upsert: true }
+        );
+
+        // ✅ Mark associated accepted forms as paid
+        await Form.updateMany(
+            { userId, status: 'accepted' },
+            { $set: { status: 'paid' } }
+        );
+
         res.status(201).json(bankDetails);
     } catch (error) {
         res.status(500).json({ error: error.message });

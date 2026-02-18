@@ -6,6 +6,7 @@ import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { PriceConfig } from "../models/priceConfigModel.js";
 import { calculatePrice } from "../utils/priceCalculator.js";
+import { Wallet } from "../models/walletModel.js";
 import {
   sendEmail,
   getFormConfirmationTemplate,
@@ -249,6 +250,18 @@ export const updateForm = async (req, res) => {
 
     await form.save();
 
+    // ✅ Sync Wallet if accepted
+    if (req.body.status === "accepted" && oldStatus !== "accepted") {
+      const amount = parseFloat(form.bidPrice) || 0;
+      if (form.userId) {
+        await Wallet.findOneAndUpdate(
+          { userId: form.userId },
+          { $inc: { balance: amount, totalEarnings: amount } },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
     // Populate before sending response
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
@@ -446,23 +459,12 @@ export const getWalletBalance = async (req, res) => {
       return res.status(400).json({ message: "User ID required" });
     }
 
-    const acceptedForms = await Form.find({
-      userId: userId,
-      status: "accepted"
-    });
-
-    const balance = acceptedForms.reduce((total, form) => {
-      return total + (parseFloat(form.bidPrice) || 0);
-    }, 0);
-
-    const pendingActions = acceptedForms.map(form => ({
-      orderId: form._id,
-      amount: form.bidPrice
-    }));
+    const wallet = await Wallet.findOne({ userId });
 
     res.json({
-      balance,
-      pendingActions
+      balance: wallet ? wallet.balance : 0,
+      totalEarnings: wallet ? wallet.totalEarnings : 0,
+      totalWithdrawn: wallet ? wallet.totalWithdrawn : 0
     });
 
   } catch (error) {
@@ -471,3 +473,42 @@ export const getWalletBalance = async (req, res) => {
   }
 };
 
+// ── BRIDGE GUEST ORDERS ───────────────────────────────────────────────
+export const bridgeGuestOrders = async (req, res) => {
+  try {
+    const { userId, orderIds } = req.body;
+
+    if (!userId || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ message: "User ID and Order IDs array required" });
+    }
+
+    // 1. Find the guest forms to calculate balance
+    const guestForms = await Form.find({
+      _id: { $in: orderIds },
+      userId: null,
+      status: "accepted"
+    });
+
+    const bridgeAmount = guestForms.reduce((sum, f) => sum + (parseFloat(f.bidPrice) || 0), 0);
+
+    // 2. Link all specified forms to this user
+    const result = await Form.updateMany(
+      { _id: { $in: orderIds }, userId: null },
+      { $set: { userId: userId } }
+    );
+
+    // 3. Update DB Wallet
+    if (bridgeAmount > 0) {
+      await Wallet.findOneAndUpdate(
+        { userId },
+        { $inc: { balance: bridgeAmount, totalEarnings: bridgeAmount } },
+        { upsert: true, new: true }
+      );
+    }
+
+    res.json({ message: "Orders bridged successfully", modified: result.modifiedCount, bridgeAmount });
+  } catch (error) {
+    console.error("❌ Bridge Error:", error);
+    res.status(500).json({ message: "Bridging failed", error: error.message });
+  }
+};

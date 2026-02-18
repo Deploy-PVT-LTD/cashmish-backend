@@ -5,9 +5,10 @@ import {
   updateForm,
   getFormById,
   deleteForm,
-  getWalletBalance, 
+  getWalletBalance,
   getDashboardStats,
   getEstimate,
+  bridgeGuestOrders,
 } from "../controllers/formController.js";
 import upload from "../middleware/upload.js";
 
@@ -19,6 +20,7 @@ router.post("/estimate", getEstimate);
 router.post("/", upload.array("images", 5), createForm);
 router.get("/", getAllForms);
 router.get("/wallet-balance/:userId", getWalletBalance);
+router.post("/bridge", bridgeGuestOrders);
 router.get("/:id", getFormById);
 router.put("/:id", updateForm);
 router.delete("/:id", deleteForm);
