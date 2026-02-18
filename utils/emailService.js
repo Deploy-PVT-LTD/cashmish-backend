@@ -2,26 +2,26 @@ import nodemailer from 'nodemailer';
 import keys from '../config/keys.js';
 
 export const sendEmail = async (options) => {
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: keys.emailUser,
-            pass: keys.emailPass,
-        },
-    });
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: keys.emailUser,
+      pass: keys.emailPass,
+    },
+  });
 
-    const mailOptions = {
-        from: `"CashMish Support" <${keys.emailUser}>`,
-        to: options.email,
-        subject: options.subject,
-        html: options.html,
-    };
+  const mailOptions = {
+    from: `"CashMish Support" <${keys.emailUser}>`,
+    to: options.email,
+    subject: options.subject,
+    html: options.html,
+  };
 
-    await transporter.sendMail(mailOptions);
+  await transporter.sendMail(mailOptions);
 };
 
 export const getResetPasswordTemplate = (resetUrl, userName) => {
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -94,7 +94,7 @@ export const getResetPasswordTemplate = (resetUrl, userName) => {
 };
 
 export const getFormConfirmationTemplate = (userName, deviceName, estimatedPrice) => {
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -176,11 +176,11 @@ export const getFormConfirmationTemplate = (userName, deviceName, estimatedPrice
 };
 
 export const getBidStatusTemplate = (userName, deviceName, status, bidPrice) => {
-    const isAccepted = status === 'accepted';
-    const color = isAccepted ? '#27ae60' : '#e74c3c';
-    const statusText = isAccepted ? 'Accepted' : 'Rejected';
+  const isAccepted = status === 'accepted';
+  const color = isAccepted ? '#27ae60' : '#e74c3c';
+  const statusText = isAccepted ? 'Accepted' : 'Rejected';
 
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -267,10 +267,10 @@ export const getBidStatusTemplate = (userName, deviceName, status, bidPrice) => 
 };
 
 export const getAdminBidOfferTemplate = (userName, deviceName, bidPrice, formId) => {
-    const acceptUrl = `http://localhost:5174/cart?id=${formId}&action=accept`;
-    const rejectUrl = `http://localhost:5174/cart?id=${formId}&action=reject`;
+  const acceptUrl = `http://localhost:5174/cart?id=${formId}&action=accept`;
+  const rejectUrl = `http://localhost:5174/cart?id=${formId}&action=reject`;
 
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -367,7 +367,7 @@ export const getAdminBidOfferTemplate = (userName, deviceName, bidPrice, formId)
 };
 
 export const getAcceptPriceTemplate = (userName, deviceName, price) => {
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -427,6 +427,76 @@ export const getAcceptPriceTemplate = (userName, deviceName, price) => {
           
           <p>Our team will contact you shortly to coordinate the pickup and final payment.</p>
           
+          <p>Thank you for choosing CashMish!</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+export const getPayoutSentTemplate = (userName, amount) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .container {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          border: 1px solid #e0e0e0;
+          border-radius: 10px;
+          background-color: #ffffff;
+        }
+        .header {
+          text-align: center;
+          padding-bottom: 20px;
+          border-bottom: 2px solid #f1f1f1;
+        }
+        .header h1 {
+          color: #2c3e50;
+          margin: 0;
+        }
+        .content {
+          color: #34495e;
+          line-height: 1.6;
+          margin-top: 20px;
+        }
+        .success-box {
+          background-color: #27ae60;
+          color: white;
+          padding: 20px;
+          border-radius: 8px;
+          text-align: center;
+          margin: 20px 0;
+          font-weight: bold;
+        }
+        .footer {
+          text-align: center;
+          font-size: 12px;
+          color: #95a5a6;
+          margin-top: 30px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>CashMish</h1>
+        </div>
+        <div class="content">
+          <p>Hello ${userName || 'User'},</p>
+          <p>Great news! Your payment has been processed and sent to your bank account.</p>
+          
+          <div class="success-box">
+            Amount Sent: $ ${amount}
+          </div>
+          
+          <p>It may take some time to reflect in your account depending on your bank's processing time.</p>
           <p>Thank you for choosing CashMish!</p>
         </div>
         <div class="footer">
