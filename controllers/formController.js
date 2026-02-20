@@ -277,44 +277,51 @@ export const updateForm = async (req, res) => {
     const bidUpdated = req.body.bidPrice !== undefined && Number(req.body.bidPrice) !== Number(oldBidPrice);
 
     if (statusChanged || bidUpdated) {
-      try {
-        let html = '';
-        let subject = '';
+      let html = '';
+      let subject = '';
 
-        if (bidUpdated && (!req.body.status || req.body.status === 'pending' || req.body.status === 'bid_placed')) {
-          subject = 'New Bid Offer for Your Device - CashMish';
-          html = getAdminBidOfferTemplate(
-            form.pickUpDetails.fullName,
-            `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
-            form.bidPrice,
-            form._id
-          );
-        } else if (req.body.status === 'accepted' && statusChanged) {
-          subject = 'Trade-in Price Accepted - CashMish';
-          html = getAcceptPriceTemplate(
-            form.pickUpDetails.fullName,
-            `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
-            form.bidPrice || form.estimatedPrice
-          );
-        } else if (req.body.status === 'rejected' && statusChanged) {
-          subject = 'Trade-in Request Status Update - CashMish';
-          html = getBidStatusTemplate(
-            form.pickUpDetails.fullName,
-            `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
-            'rejected',
-            0
-          );
-        }
+      if (bidUpdated && (!req.body.status || req.body.status === 'pending' || req.body.status === 'bid_placed')) {
+        subject = 'New Bid Offer for Your Device - CashMish';
+        html = getAdminBidOfferTemplate(
+          form.pickUpDetails.fullName,
+          `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+          req.body.bidPrice, // Use new bid price
+          form._id
+        );
+      } else if (req.body.status === 'accepted' && statusChanged) {
+        subject = 'Trade-in Price Accepted - CashMish';
+        // ... (template logic for accepted) ...
+        html = getAcceptPriceTemplate(
+          form.pickUpDetails.fullName,
+          `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+          form.bidPrice || form.estimatedPrice
+        );
+      } else if (req.body.status === 'rejected' && statusChanged) {
+        // ... (template logic for rejected) ...
+        subject = 'Trade-in Request Status Update - CashMish';
+        html = getBidStatusTemplate(
+          form.pickUpDetails.fullName,
+          `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+          'rejected',
+          0
+        );
+      }
 
-        if (html && subject) {
-          sendEmail({
-            email: form.pickUpDetails.email,
+      if (subject && html && form.userId && form.userId.email) {
+        console.log(`[DEBUG] Attempting to send email for Form ID: ${form._id}`);
+        console.log(`[DEBUG] Subject: ${subject}`);
+        console.log(`[DEBUG] Recipient: ${form.userId.email}`);
+
+        try {
+          await sendEmail({
+            email: form.userId.email,
             subject,
-            html,
-          }).catch(err => console.error("📧 Non-blocking email error (Update):", err.message));
+            html
+          });
+          console.log(`[DEBUG] Email sent successfully for form update`);
+        } catch (emailErr) {
+          console.error(`[DEBUG] Failed to send form update email:`, emailErr);
         }
-      } catch (emailError) {
-        // Silent error for email template generation
       }
     }
 

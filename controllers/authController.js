@@ -145,14 +145,17 @@ export const forgotPassword = async (req, res) => {
     const html = getResetPasswordTemplate(resetUrl, user.name);
 
     try {
-      sendEmail({
+      console.log(`[DEBUG] Calling sendEmail for ${user.email}`);
+      await sendEmail({
         email: user.email,
         subject: 'Password Reset Request',
-        html,
-      }).catch(err => console.error("📧 Non-blocking email error (Reset):", err.message));
+        html: html,
+      });
+      console.log(`[DEBUG] Email send promise resolved`);
 
       res.status(200).json({ message: 'Reset link sent to email' });
     } catch (err) {
+      console.error(`[DEBUG] sendEmail failed in controller:`, err);
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save();

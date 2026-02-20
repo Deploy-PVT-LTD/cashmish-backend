@@ -17,7 +17,15 @@ export const sendEmail = async (options) => {
     html: options.html,
   };
 
-  await transporter.sendMail(mailOptions);
+  console.log(`[DEBUG] Attempting to send email to: ${options.email}`);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[DEBUG] Email sent successfully: ${info.messageId}`);
+    return info;
+  } catch (error) {
+    console.error(`[DEBUG] Error in sendEmail:`, error);
+    throw error;
+  }
 };
 
 export const getResetPasswordTemplate = (resetUrl, userName) => {

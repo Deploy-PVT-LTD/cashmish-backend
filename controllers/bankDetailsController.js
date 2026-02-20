@@ -57,6 +57,7 @@ export const updateBankDetails = async (req, res) => {
 
         // ✅ Send Payout Confirmation Email if status changed to 'paid'
         if (status === 'paid' && oldDetails.status !== 'paid') {
+            console.log(`[DEBUG] Payout status changed to paid for BankDetails ID: ${id}. Sending email to ${bankDetails.userId.email}`);
             try {
                 const subject = 'Payment Processed - CashMish';
                 const html = getPayoutSentTemplate(
@@ -69,9 +70,12 @@ export const updateBankDetails = async (req, res) => {
                     subject,
                     html,
                 });
+                console.log(`[DEBUG] Payout email sent successfully to ${bankDetails.userId.email}`);
             } catch (emailError) {
-                console.error("📧 Payout email error:", emailError.message);
+                console.error("📧 Payout email error:", emailError);
             }
+        } else {
+            console.log(`[DEBUG] Status update for BankDetails ID: ${id}. Status: ${status}, Old Status: ${oldDetails.status}. Email NOT sent.`);
         }
 
         res.status(200).json(bankDetails);
