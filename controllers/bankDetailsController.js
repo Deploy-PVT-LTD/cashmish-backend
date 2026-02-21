@@ -55,30 +55,27 @@ export const updateBankDetails = async (req, res) => {
 
         const bankDetails = await BankDetails.findByIdAndUpdate(id, updateData, { new: true }).populate("userId", "name email");
 
-        // ✅ Send Payout Confirmation Email if status changed to 'paid'
-        if (status === 'paid' && oldDetails.status !== 'paid') {
-            console.log(`[DEBUG] Payout status changed to paid for BankDetails ID: ${id}. Sending email to ${bankDetails.userId.email}`);
-            try {
-                const subject = 'Payment Processed - CashMish';
-                const html = getPayoutSentTemplate(
-                    bankDetails.userId.name,
-                    bankDetails.amount
-                );
-
-                await sendEmail({
-                    email: bankDetails.userId.email,
-                    subject,
-                    html,
-                });
-                console.log(`[DEBUG] Payout email sent successfully to ${bankDetails.userId.email}`);
-            } catch (emailError) {
-                console.error("📧 Payout email error:", emailError);
-            }
-        } else {
-            console.log(`[DEBUG] Status update for BankDetails ID: ${id}. Status: ${status}, Old Status: ${oldDetails.status}. Email NOT sent.`);
-        }
-
+        // ✅ Send response FIRST (non-blocking)
         res.status(200).json(bankDetails);
+
+        // ✅ Send Payout Confirmation Email in background (fire-and-forget)
+        if (status === 'paid' && oldDetails.status !== 'paid') {
+            const subject = 'Payment Processed - CashMish';
+            const html = getPayoutSentTemplate(
+                bankDetails.userId.name,
+                bankDetails.amount
+            );
+
+            sendEmail({
+                email: bankDetails.userId.email,
+                subject,
+                html,
+            }).then(() => {
+                console.log(`[DEBUG] Payout email sent successfully to ${bankDetails.userId.email}`);
+            }).catch(emailError => {
+                console.error("📧 Payout email error:", emailError.message);
+            });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -272,7 +272,10 @@ export const updateForm = async (req, res) => {
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    // Send refined email notifications
+    // ✅ Send response FIRST, then email in background (non-blocking)
+    res.json(form);
+
+    // Send refined email notifications (fire-and-forget)
     const statusChanged = req.body.status && req.body.status !== oldStatus;
     const bidUpdated = req.body.bidPrice !== undefined && Number(req.body.bidPrice) !== Number(oldBidPrice);
 
@@ -285,19 +288,17 @@ export const updateForm = async (req, res) => {
         html = getAdminBidOfferTemplate(
           form.pickUpDetails.fullName,
           `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
-          req.body.bidPrice, // Use new bid price
+          req.body.bidPrice,
           form._id
         );
       } else if (req.body.status === 'accepted' && statusChanged) {
         subject = 'Trade-in Price Accepted - CashMish';
-        // ... (template logic for accepted) ...
         html = getAcceptPriceTemplate(
           form.pickUpDetails.fullName,
           `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
           form.bidPrice || form.estimatedPrice
         );
       } else if (req.body.status === 'rejected' && statusChanged) {
-        // ... (template logic for rejected) ...
         subject = 'Trade-in Request Status Update - CashMish';
         html = getBidStatusTemplate(
           form.pickUpDetails.fullName,
@@ -308,24 +309,17 @@ export const updateForm = async (req, res) => {
       }
 
       if (subject && html && form.userId && form.userId.email) {
-        console.log(`[DEBUG] Attempting to send email for Form ID: ${form._id}`);
-        console.log(`[DEBUG] Subject: ${subject}`);
-        console.log(`[DEBUG] Recipient: ${form.userId.email}`);
-
-        try {
-          await sendEmail({
-            email: form.userId.email,
-            subject,
-            html
-          });
+        sendEmail({
+          email: form.userId.email,
+          subject,
+          html
+        }).then(() => {
           console.log(`[DEBUG] Email sent successfully for form update`);
-        } catch (emailErr) {
-          console.error(`[DEBUG] Failed to send form update email:`, emailErr);
-        }
+        }).catch(emailErr => {
+          console.error(`[DEBUG] Failed to send form update email:`, emailErr.message);
+        });
       }
     }
-
-    res.json(form);
   } catch (error) {
     console.error("❌ Update form error:", error);
     res.status(500).json({ message: "Update failed", error: error.message });
