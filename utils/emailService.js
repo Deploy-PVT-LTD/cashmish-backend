@@ -5,13 +5,13 @@ import keys from '../config/keys.js';
 const transporter = nodemailer.createTransport({
   host: keys.smtpHost,
   port: keys.smtpPort,
-  secure: keys.smtpPort === 465, // true for 465, false for other ports
+  secure: true, // TLS on port 587
   auth: {
     user: keys.smtpUser,
     pass: keys.smtpPass,
   },
   tls: {
-    rejectUnauthorized: false
+    ciphers: 'SSLv3',
   },
 });
 
