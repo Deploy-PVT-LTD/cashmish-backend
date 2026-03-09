@@ -21,6 +21,7 @@ import couponRoutes from './routes/couponRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import blogRoutes from './routes/blogRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import draftOrderRoutes from './routes/draftOrderRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -76,6 +77,7 @@ app.use("/api/coupons", couponRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/drafts", draftOrderRoutes);
 
 //connect to database and start server
 connectDB();
