@@ -22,6 +22,8 @@ import reviewRoutes from './routes/reviewRoutes.js';
 import blogRoutes from './routes/blogRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import draftOrderRoutes from './routes/draftOrderRoutes.js';
+import trafficRoutes from './routes/trafficRoutes.js';
+import { trackTraffic } from './middleware/trafficTracker.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +61,7 @@ passportConfig(passport);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(trackTraffic);
 
 app.get('/', (req, res) => {
   res.send('Welcome to the Reseller Backend API');
@@ -78,6 +81,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/drafts", draftOrderRoutes);
+app.use("/api/traffic", trafficRoutes);
 
 //connect to database and start server
 connectDB();
