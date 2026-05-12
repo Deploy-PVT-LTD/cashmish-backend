@@ -63,11 +63,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(trackTraffic);
 
+// Welcome route
 app.get('/', (req, res) => {
-  res.send('Welcome to the Reseller Backend API');
+  res.send('Welcome to the Reseller Backend API (Traffic Tracking Active)');
 });
 
 //routes
+app.use("/api/traffic", trafficRoutes); // Moved to top for priority
 app.use("/api/auth", authRoutes);
 app.use("/api/mobiles", mobileRoutes);
 app.use("/api/forms", formRoutes);
@@ -81,7 +83,6 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/drafts", draftOrderRoutes);
-app.use("/api/traffic", trafficRoutes);
 
 //connect to database and start server
 connectDB();
