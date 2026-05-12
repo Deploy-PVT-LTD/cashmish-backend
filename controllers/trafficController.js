@@ -1,5 +1,11 @@
 import Visitor from '../models/visitorModel.js';
 
+// Simple ping handler — just responds OK.
+// The actual visitor recording is done by the trackTraffic middleware before this runs.
+export const pingVisitor = (req, res) => {
+  res.status(200).json({ success: true });
+};
+
 export const getTrafficStats = async (req, res) => {
   try {
     const totalVisitors = await Visitor.countDocuments();
@@ -17,13 +23,14 @@ export const getTrafficStats = async (req, res) => {
       { $limit: 10 }
     ]);
 
-    // Get recent visitors
-    const recentVisitors = await Visitor.find()
-      .sort({ createdAt: -1 })
-      .limit(50);
-
     // Get unique visitors count (by IP)
     const uniqueVisitors = await Visitor.distinct('ip');
+
+    // Get visitors in the last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentVisitors = await Visitor.find({ createdAt: { $gte: twentyFourHoursAgo } })
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     res.status(200).json({
       success: true,

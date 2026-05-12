@@ -7,7 +7,8 @@ export const trackTraffic = async (req, res, next) => {
     
     // 1. Skip tracking for admin-only routes, static files, and internal paths
     const excludedPaths = [
-      '/api/traffic',
+      '/api/traffic/stats',
+      '/api/traffic/history',
       '/api/auth',
       '/api/admin',
       '/static',
