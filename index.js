@@ -65,7 +65,7 @@ app.use(trackTraffic);
 
 // Welcome route
 app.get('/', (req, res) => {
-  res.send('Welcome to the Reseller Backend API (Traffic Tracking Active)');
+  res.send('Welcome to the Reseller Backend API v1.0.1 (Traffic Tracking Active)');
 });
 
 //routes
