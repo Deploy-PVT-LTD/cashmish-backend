@@ -563,10 +563,13 @@ export const getGuestWalletBalance = async (req, res) => {
       return res.status(200).json({ balance: 0, pendingActions: [] });
     }
 
-    // Find accepted guest forms (Only those that are still userId: null)
+    // Find accepted guest forms (ONLY those that are truly unassigned)
     const acceptedForms = await Form.find({
       _id: { $in: orderIds },
-      userId: null,
+      $or: [
+        { userId: null },
+        { userId: { $exists: false } }
+      ],
       status: "accepted"
     });
 
