@@ -1,50 +1,41 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import keys from '../config/keys.js';
 
-// Create transporter once at module level
-const transporter = nodemailer.createTransport({
-  host: keys.smtpHost,
-  port: keys.smtpPort,
-  secure: true, // TLS on port 587
-  auth: {
-    user: keys.smtpUser,
-    pass: keys.smtpPass,
-  },
-  tls: {
-    ciphers: 'SSLv3',
-  },
-});
+// Initialize Resend with API Key
+const resend = new Resend(keys.resendApiKey);
 
-// ✅ Verify SMTP connection on startup
-(async () => {
-  try {
-    await transporter.verify();
-    console.log("✅ SMTP READY — connected to", keys.smtpHost, "as", keys.smtpUser);
-  } catch (err) {
-    console.error("❌ SMTP ERROR:", err.message);
-  }
-})();
+// ✅ Verify presence of API Key on startup
+if (!keys.resendApiKey) {
+    console.error("❌ RESEND ERROR: API Key is missing in .env");
+} else {
+    console.log("✅ RESEND INITIALIZED — Mails will be sent from", keys.emailFrom);
+}
 
 export const sendEmail = async (options) => {
-
-  const mailOptions = {
-    from: `"CashMish Support" <${keys.emailFrom}>`,
-    to: options.email,
-    subject: options.subject,
-    html: options.html,
-  };
-
-  console.log(`[DEBUG] Attempting to send email to: ${options.email}`);
+  console.log(`[RESEND] Attempting to send email to: ${options.email}`);
+  
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[DEBUG] Email sent successfully: ${info.messageId}`);
-    return info;
-  } catch (error) {
-    console.error(`[DEBUG] Error in sendEmail:`, error);
-    throw error;
+    const { data, error } = await resend.emails.send({
+      from: `CashMish Support <${keys.emailFrom}>`,
+      to: [options.email],
+      subject: options.subject,
+      html: options.html,
+    });
+
+    if (error) {
+      console.error(`[RESEND] API Error:`, error);
+      throw new Error(error.message);
+    }
+
+    console.log(`[RESEND] Email sent successfully! ID: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error(`[RESEND] Execution Error:`, err);
+    throw err;
   }
 };
 
+// Templates remain exactly the same as they return HTML strings
 export const getResetPasswordTemplate = (resetUrl, userName) => {
   return `
     <!DOCTYPE html>
