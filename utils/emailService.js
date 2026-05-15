@@ -283,8 +283,8 @@ export const getBidStatusTemplate = (userName, deviceName, status, bidPrice) => 
 };
 
 export const getAdminBidOfferTemplate = (userName, deviceName, bidPrice, formId) => {
-  const acceptUrl = `https://cashmish.vercel.app/cart?id=${formId}&action=accept`;
-  const rejectUrl = `https://cashmish.vercel.app/cart?id=${formId}&action=reject`;
+  const acceptUrl = `https://cashmish.com/cart?id=${formId}&action=accept`;
+  const rejectUrl = `https://cashmish.com/cart?id=${formId}&action=reject`;
 
   return `
     <!DOCTYPE html>

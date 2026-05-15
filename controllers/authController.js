@@ -148,7 +148,7 @@ export const forgotPassword = async (req, res) => {
     await user.save();
 
     // Create reset url
-    const resetUrl = `https://cashmish.vercel.app/reset-password/${resetToken}`;
+    const resetUrl = `https://cashmish.com/reset-password/${resetToken}`;
 
     const html = getResetPasswordTemplate(resetUrl, user.name);
 
