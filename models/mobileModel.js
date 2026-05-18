@@ -15,6 +15,11 @@ const mobileSchema = new mongoose.Schema({
         required: true,
         min: [0, "Base Price cannot be negative"]
     },
+    basePriceLocked: {
+        type: Number,
+        default: 0,
+        min: [0, "Locked Price cannot be negative"]
+    },
     image: {
         type: String
     },

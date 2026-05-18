@@ -92,8 +92,11 @@ export const createForm = async (req, res) => {
     }
 
     // Calculate estimated price
+    const isLocked = carrier && carrier.toLowerCase() !== 'unlocked';
+    const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
+
     const estimatedPrice = calculatePrice(
-      mobile.basePrice,
+      activeBasePrice,
       {
         storage,
         screen: screenCondition,
@@ -171,6 +174,7 @@ export const getEstimate = async (req, res) => {
     const {
       mobileId,
       storage,
+      carrier,
       screenCondition,
       bodyCondition,
       batteryCondition,
@@ -209,8 +213,11 @@ export const getEstimate = async (req, res) => {
     }
 
     // Calculate estimated price
+    const isLocked = carrier && carrier.toLowerCase() !== 'unlocked';
+    const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
+
     const estimatedPrice = calculatePrice(
-      mobile.basePrice,
+      activeBasePrice,
       {
         storage,
         screen: screenCondition,
