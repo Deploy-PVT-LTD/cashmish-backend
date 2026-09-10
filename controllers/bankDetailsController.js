@@ -2,6 +2,7 @@ import { BankDetails } from "../models/bankDetailsModel.js";
 import { Wallet } from "../models/walletModel.js";
 import { Form } from "../models/formModel.js";
 import { sendEmail, getPayoutSentTemplate } from "../utils/emailService.js";
+import { sendSMS, getPayoutSentSMS } from "../utils/smsService.js";
 
 //add bank details (supports bank + zelle)
 export const addBankDetails = async (req, res) => {
@@ -78,7 +79,7 @@ export const updateBankDetails = async (req, res) => {
         // ✅ Send response FIRST (non-blocking)
         res.status(200).json(bankDetails);
 
-        // ✅ Send Payout Confirmation Email in background (fire-and-forget)
+        // ✅ Send Payout Confirmation Email + SMS in background (fire-and-forget)
         if (status === 'paid' && oldDetails.status !== 'paid') {
             const subject = 'Payment Processed - CashMish';
             const html = getPayoutSentTemplate(
@@ -95,6 +96,25 @@ export const updateBankDetails = async (req, res) => {
             }).catch(emailError => {
                 console.error("📧 Payout email error:", emailError.message);
             });
+
+            // User model has no phone field, so pull the most recent
+            // pickup phone number from this user's own forms.
+            Form.findOne({ userId: bankDetails.userId._id || bankDetails.userId })
+                .sort({ createdAt: -1 })
+                .then((latestForm) => {
+                    const phone = latestForm?.pickUpDetails?.phoneNumber;
+                    if (!phone) {
+                        console.warn(`[DEBUG] No phone number found for user ${bankDetails.userId._id}, skipping payout SMS.`);
+                        return;
+                    }
+
+                    const smsText = getPayoutSentSMS(bankDetails.userId.name, bankDetails.amount);
+
+                    sendSMS({ phone, message: smsText })
+                        .then(() => console.log(`[DEBUG] Payout SMS sent successfully to ${phone}`))
+                        .catch((smsError) => console.error("📱 Payout SMS error:", smsError.message));
+                })
+                .catch((err) => console.error("📱 Payout SMS lookup error:", err.message));
         }
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -1,19 +1,24 @@
 import { Resend } from 'resend';
 import keys from '../config/keys.js';
 
-// Initialize Resend with API Key
-const resend = new Resend(keys.resendApiKey);
+// Initialize Resend with API Key (skip if missing so a bare/dev .env doesn't crash startup)
+const resend = keys.resendApiKey ? new Resend(keys.resendApiKey) : null;
 
 // ✅ Verify presence of API Key on startup
 if (!keys.resendApiKey) {
-    console.error("❌ RESEND ERROR: API Key is missing in .env");
+    console.error("❌ RESEND ERROR: API Key is missing in .env — emails will be skipped.");
 } else {
     console.log("✅ RESEND INITIALIZED — Mails will be sent from", keys.emailFrom);
 }
 
 export const sendEmail = async (options) => {
+  if (!resend) {
+    console.warn(`[RESEND] Skipped — no API key configured. Would have emailed: ${options.email}`);
+    return { skipped: true };
+  }
+
   console.log(`[RESEND] Attempting to send email to: ${options.email}`);
-  
+
   try {
     const { data, error } = await resend.emails.send({
       from: `CashMish Support <${keys.emailFrom}>`,

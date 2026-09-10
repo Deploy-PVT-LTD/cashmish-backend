@@ -23,6 +23,7 @@ import blogRoutes from './routes/blogRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import draftOrderRoutes from './routes/draftOrderRoutes.js';
 import trafficRoutes from './routes/trafficRoutes.js';
+import smsRoutes from './routes/smsRoutes.js';
 import { trackTraffic } from './middleware/trafficTracker.js';
 
 const app = express();
@@ -83,6 +84,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/drafts", draftOrderRoutes);
+app.use("/api/sms", smsRoutes);
 
 //connect to database and start server
 connectDB();

@@ -15,6 +15,13 @@ import {
   getAdminBidOfferTemplate,
   getAcceptPriceTemplate
 } from "../utils/emailService.js";
+import {
+  sendSMS,
+  getFormConfirmationSMS,
+  getAdminBidOfferSMS,
+  getAcceptPriceSMS,
+  getBidStatusRejectedSMS
+} from "../utils/smsService.js";
 
 export const createForm = async (req, res) => {
   try {
@@ -158,8 +165,20 @@ export const createForm = async (req, res) => {
         subject: 'Form Submission Confirmation - CashMish',
         html,
       }).catch(err => console.error("📧 Non-blocking email error (Confirmation):", err.message));
+
+      // Send confirmation SMS (Non-blocking)
+      const smsMessage = getFormConfirmationSMS(
+        form.pickUpDetails.fullName,
+        `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+        form.estimatedPrice
+      );
+
+      sendSMS({
+        phone: form.pickUpDetails.phoneNumber,
+        message: smsMessage,
+      }).catch(err => console.error("📱 Non-blocking SMS error (Confirmation):", err.message));
     } catch (error) {
-      // Silent error for email template generation
+      // Silent error for email/SMS template generation
     }
 
     res.status(201).json(form);
@@ -333,30 +352,36 @@ export const updateForm = async (req, res) => {
     if (statusChanged || bidUpdated) {
       let html = '';
       let subject = '';
+      let smsText = '';
+
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
 
       if (bidUpdated && (!req.body.status || req.body.status === 'pending' || req.body.status === 'bid_placed')) {
         subject = 'New Bid Offer for Your Device - CashMish';
         html = getAdminBidOfferTemplate(
           form.pickUpDetails.fullName,
-          `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+          deviceName,
           req.body.bidPrice,
           form._id
         );
+        smsText = getAdminBidOfferSMS(form.pickUpDetails.fullName, deviceName, req.body.bidPrice);
       } else if (req.body.status === 'accepted' && statusChanged) {
         subject = 'Trade-in Price Accepted - CashMish';
         html = getAcceptPriceTemplate(
           form.pickUpDetails.fullName,
-          `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+          deviceName,
           form.bidPrice || form.estimatedPrice
         );
+        smsText = getAcceptPriceSMS(form.pickUpDetails.fullName, deviceName, form.bidPrice || form.estimatedPrice);
       } else if (req.body.status === 'rejected' && statusChanged) {
         subject = 'Trade-in Request Status Update - CashMish';
         html = getBidStatusTemplate(
           form.pickUpDetails.fullName,
-          `${form.mobileId.brand} ${form.mobileId.phoneModel}`,
+          deviceName,
           'rejected',
           0
         );
+        smsText = getBidStatusRejectedSMS(form.pickUpDetails.fullName, deviceName);
       }
 
       if (subject && html && form.userId && form.userId.email) {
@@ -368,6 +393,17 @@ export const updateForm = async (req, res) => {
           console.log(`[DEBUG] Email sent successfully for form update`);
         }).catch(emailErr => {
           console.error(`[DEBUG] Failed to send form update email:`, emailErr.message);
+        });
+      }
+
+      if (smsText && form.pickUpDetails && form.pickUpDetails.phoneNumber) {
+        sendSMS({
+          phone: form.pickUpDetails.phoneNumber,
+          message: smsText,
+        }).then(() => {
+          console.log(`[DEBUG] SMS sent successfully for form update`);
+        }).catch(smsErr => {
+          console.error(`[DEBUG] Failed to send form update SMS:`, smsErr.message);
         });
       }
     }

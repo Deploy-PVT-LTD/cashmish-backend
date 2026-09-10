@@ -1,2 +1,4 @@
 node_modules
 .env
+.pre-sms-merge-backup-*/
+.pre-sms-webhook-merge-backup-*/
