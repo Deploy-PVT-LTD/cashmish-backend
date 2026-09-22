@@ -46,14 +46,22 @@ const formSchema = new mongoose.Schema(
       required: true,
     },
 
-    storage: { type: String, required: true },
-    carrier: { type: String, required: true },
+    storage: { type: String },
+    // Not every category has a carrier/lock-status step (only phones, by default).
+    carrier: { type: String, default: '' },
 
     condition: { type: String, required: true },
 
-    screenCondition: { type: String, required: true },
-    bodyCondition: { type: String, required: true },
-    batteryCondition: { type: String, required: true },
+    // Generic map of questionKey -> chosen optionKey, driven by the product's
+    // category (Category.assessmentQuestions). Works for any category's question set.
+    conditionAnswers: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    // Legacy mirrors of conditionAnswers.screen/body/battery — kept optional (not
+    // every category has these specific questions) so older admin pages/exports that
+    // read them directly keep working for Mobile Phones without any changes.
+    screenCondition: { type: String },
+    bodyCondition: { type: String },
+    batteryCondition: { type: String },
 
     images: [String],
 

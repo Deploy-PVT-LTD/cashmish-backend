@@ -23,6 +23,34 @@ import {
   getBidStatusRejectedSMS
 } from "../utils/smsService.js";
 
+// Merge global default rules with this product's own overrides, generically across
+// whatever question keys exist — works for any category, not just phones.
+const buildEffectiveRules = async (mobile) => {
+  const globalRules = await PriceConfig.findOne();
+  const effectiveRules = globalRules ? JSON.parse(JSON.stringify(globalRules)) : {};
+
+  if (mobile.deductionRules) {
+    for (const key of Object.keys(mobile.deductionRules)) {
+      effectiveRules[key] = { ...effectiveRules[key], ...mobile.deductionRules[key] };
+    }
+  }
+  return effectiveRules;
+};
+
+// Accepts the new generic `conditionAnswers` map (questionKey -> chosen optionKey), or
+// — for backward compatibility with older cached frontend bundles — the original
+// discrete screen/body/battery fields, folding the latter into the same generic shape.
+const resolveConditionAnswers = ({ conditionAnswers, screenCondition, bodyCondition, batteryCondition }) => {
+  if (conditionAnswers) {
+    return typeof conditionAnswers === 'string' ? JSON.parse(conditionAnswers) : conditionAnswers;
+  }
+  const answers = {};
+  if (screenCondition) answers.screen = screenCondition;
+  if (bodyCondition) answers.body = bodyCondition;
+  if (batteryCondition) answers.battery = batteryCondition;
+  return answers;
+};
+
 export const createForm = async (req, res) => {
   try {
     let {
@@ -30,6 +58,7 @@ export const createForm = async (req, res) => {
       storage,
       carrier,
       condition,
+      conditionAnswers,
       screenCondition,
       bodyCondition,
       batteryCondition,
@@ -74,29 +103,8 @@ export const createForm = async (req, res) => {
     }
 
     // Get pricing rules
-    let globalRules = await PriceConfig.findOne();
-    let effectiveRules = globalRules
-      ? JSON.parse(JSON.stringify(globalRules))
-      : {};
-
-    // Apply mobile-specific deduction rules
-    if (mobile.deductionRules) {
-      if (mobile.deductionRules.screen)
-        effectiveRules.screen = {
-          ...effectiveRules.screen,
-          ...mobile.deductionRules.screen,
-        };
-      if (mobile.deductionRules.body)
-        effectiveRules.body = {
-          ...effectiveRules.body,
-          ...mobile.deductionRules.body,
-        };
-      if (mobile.deductionRules.battery)
-        effectiveRules.battery = {
-          ...effectiveRules.battery,
-          ...mobile.deductionRules.battery,
-        };
-    }
+    const effectiveRules = await buildEffectiveRules(mobile);
+    const answers = resolveConditionAnswers({ conditionAnswers, screenCondition, bodyCondition, batteryCondition });
 
     // Calculate estimated price
     const isLocked = carrier && carrier.toLowerCase() !== 'unlocked';
@@ -104,12 +112,7 @@ export const createForm = async (req, res) => {
 
     const estimatedPrice = calculatePrice(
       activeBasePrice,
-      {
-        storage,
-        screen: screenCondition,
-        body: bodyCondition,
-        battery: batteryCondition,
-      },
+      { storage, ...answers },
       effectiveRules
     );
 
@@ -119,9 +122,13 @@ export const createForm = async (req, res) => {
       storage,
       carrier,
       condition,
-      screenCondition,
-      bodyCondition,
-      batteryCondition,
+      conditionAnswers: answers,
+      // Legacy mirrors kept for any admin page/export still reading these directly —
+      // populated automatically whenever the category's questions use these exact
+      // keys (as Mobile Phones does); simply absent for other categories.
+      screenCondition: answers.screen,
+      bodyCondition: answers.body,
+      batteryCondition: answers.battery,
       images: imageUrls,
       estimatedPrice,
       pickUpDetails,
@@ -194,6 +201,7 @@ export const getEstimate = async (req, res) => {
       mobileId,
       storage,
       carrier,
+      conditionAnswers,
       screenCondition,
       bodyCondition,
       batteryCondition,
@@ -207,29 +215,8 @@ export const getEstimate = async (req, res) => {
     if (!mobile) return res.status(404).json({ message: "Mobile not found" });
 
     // Get pricing rules
-    let globalRules = await PriceConfig.findOne();
-    let effectiveRules = globalRules
-      ? JSON.parse(JSON.stringify(globalRules))
-      : {};
-
-    // Apply mobile-specific deduction rules
-    if (mobile.deductionRules) {
-      if (mobile.deductionRules.screen)
-        effectiveRules.screen = {
-          ...effectiveRules.screen,
-          ...mobile.deductionRules.screen,
-        };
-      if (mobile.deductionRules.body)
-        effectiveRules.body = {
-          ...effectiveRules.body,
-          ...mobile.deductionRules.body,
-        };
-      if (mobile.deductionRules.battery)
-        effectiveRules.battery = {
-          ...effectiveRules.battery,
-          ...mobile.deductionRules.battery,
-        };
-    }
+    const effectiveRules = await buildEffectiveRules(mobile);
+    const answers = resolveConditionAnswers({ conditionAnswers, screenCondition, bodyCondition, batteryCondition });
 
     // Calculate estimated price
     const isLocked = carrier && carrier.toLowerCase() !== 'unlocked';
@@ -237,12 +224,7 @@ export const getEstimate = async (req, res) => {
 
     const estimatedPrice = calculatePrice(
       activeBasePrice,
-      {
-        storage,
-        screen: screenCondition,
-        body: bodyCondition,
-        battery: batteryCondition,
-      },
+      { storage, ...answers },
       effectiveRules
     );
 

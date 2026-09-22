@@ -10,6 +10,7 @@ import bodyParser from 'body-parser';
 import authRoutes from './routes/authRoutes.js';
 import passportConfig from './config/passport.js';
 import mobileRoutes from './routes/mobileRoute.js';
+import categoryRoutes from './routes/categoryRoutes.js';
 import formRoutes from './routes/formRoutes.js';
 import pickupRoutes from './routes/pickupRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
@@ -73,6 +74,7 @@ app.get('/', (req, res) => {
 app.use("/api/traffic", trafficRoutes); // Moved to top for priority
 app.use("/api/auth", authRoutes);
 app.use("/api/mobiles", mobileRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/forms", formRoutes);
 app.use("/api/pickup", pickupRoutes);
 app.use("/api/contact", contactRoutes);

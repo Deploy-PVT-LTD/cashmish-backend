@@ -1,10 +1,18 @@
 import mongoose from "mongoose";
 
 const mobileSchema = new mongoose.Schema({
+    // Category slug (e.g. "mobile-phones", "laptops", "gaming-consoles") — see Category model.
+    // Defaults to "mobile-phones" for backward compatibility with items added before categories existed.
+    category: {
+        type: String,
+        default: 'mobile-phones',
+        lowercase: true,
+        trim: true
+    },
     brand: {
         type: String,
-        enum: ['Apple', 'Samsung'],
-        required: true
+        required: true,
+        trim: true
     },
     phoneModel: {
         type: String,
@@ -27,22 +35,14 @@ const mobileSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    // Generic map of questionKey -> { optionKey: percentDeduction }, matching whatever
+    // Category.assessmentQuestions defines for this product's category. Kept as Mixed
+    // (rather than a fixed screen/body/battery sub-schema) so any category's question
+    // set can be stored the same way — existing {screen,body,battery} data reads back
+    // identically under Mixed, no migration needed.
     deductionRules: {
-        screen: {
-            perfect: { type: Number },
-            scratched: { type: Number },
-            cracked: { type: Number }
-        },
-        body: {
-            perfect: { type: Number },
-            scratched: { type: Number },
-            damaged: { type: Number }
-        },
-        battery: {
-            good: { type: Number },
-            average: { type: Number },
-            poor: { type: Number }
-        }
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
     }
 }, { timestamps: true })
 

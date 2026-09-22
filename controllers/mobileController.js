@@ -7,11 +7,12 @@ const isSuperAdmin = (req) => req.user && req.user.role === 'superadmin';
 //   ADD MOBILE (ADMIN/SUPERADMIN)
 export const addMobile = async (req, res) => {
   try {
-    const { brand, phoneModel, basePrice, basePriceLocked, image, deductionRules } = req.body;
+    const { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules } = req.body;
 
     if (isSuperAdmin(req)) {
       // Direct Create for Super Admin
       const mobile = await Mobile.create({
+        category,
         brand,
         phoneModel,
         basePrice,
@@ -24,7 +25,7 @@ export const addMobile = async (req, res) => {
       // Create Request for Admin
       const request = await MobileRequest.create({
         type: 'CREATE',
-        data: { brand, phoneModel, basePrice, basePriceLocked, image, deductionRules },
+        data: { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules },
         requestedBy: req.user._id
       });
       return res.status(200).json({ message: "Request submitted for approval", request });
@@ -39,6 +40,11 @@ export const addMobile = async (req, res) => {
 export const getMobiles = async (req, res) => {
   try {
     const query = req.query.includeInactive === 'true' ? {} : { isActive: true };
+
+    // Category Filter
+    if (req.query.category && req.query.category !== 'all') {
+      query.category = req.query.category.toLowerCase();
+    }
 
     // Brand Filter
     if (req.query.brand && req.query.brand !== 'all') {
@@ -97,16 +103,21 @@ export const getMobileById = async (req, res) => {
 //   GET MOBILES BY BRAND
 export const getMobilesByBrand = async (req, res) => {
   try {
-    const { brand } = req.query;
+    const { brand, category } = req.query;
 
     if (!brand) {
       return res.status(400).json({ message: "Brand is required" });
     }
 
-    const mobiles = await Mobile.find({
+    const filter = {
       brand: { $regex: new RegExp(`^${brand}$`, "i") },
       isActive: true
-    }).select("phoneModel _id image");
+    };
+    if (category && category !== 'all') {
+      filter.category = category.toLowerCase();
+    }
+
+    const mobiles = await Mobile.find(filter).select("phoneModel _id image");
 
     res.json(mobiles);
   } catch (error) {
@@ -118,7 +129,7 @@ export const getMobilesByBrand = async (req, res) => {
 export const updateMobile = async (req, res) => {
   try {
     const updates = {};
-    const fields = ["brand", "phoneModel", "basePrice", "basePriceLocked", "isActive", "image", "deductionRules"];
+    const fields = ["category", "brand", "phoneModel", "basePrice", "basePriceLocked", "isActive", "image", "deductionRules"];
 
     fields.forEach(field => {
       if (req.body[field] !== undefined) {
