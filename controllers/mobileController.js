@@ -5,10 +5,31 @@ import * as XLSX from "xlsx";
 // Helper to check if user is superadmin
 const isSuperAdmin = (req) => req.user && req.user.role === 'superadmin';
 
+// Normalizes casing on known model-line words (Apple's own stylization:
+// "iPhone", "Pro", "Max", "Plus", "Air" — except "mini", which Apple always
+// writes lowercase, e.g. "iPhone 13 mini") and trims stray whitespace, so
+// admin-entered names display consistently everywhere without needing manual
+// cleanup. Any word not in the list (brand-specific terms, numbers, etc.)
+// passes through unchanged.
+const MODEL_WORD_CASE_MAP = {
+  iphone: 'iPhone',
+  pro: 'Pro',
+  max: 'Max',
+  plus: 'Plus',
+  air: 'Air',
+  mini: 'mini',
+};
+const normalizeModelName = (raw) => {
+  if (typeof raw !== 'string') return raw;
+  const words = raw.trim().replace(/\s+/g, ' ').split(' ');
+  return words.map((w) => MODEL_WORD_CASE_MAP[w.toLowerCase()] ?? w).join(' ');
+};
+
 //   ADD MOBILE (ADMIN/SUPERADMIN)
 export const addMobile = async (req, res) => {
   try {
-    const { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules, gradePricing } = req.body;
+    const { category, brand, basePrice, basePriceLocked, image, deductionRules, gradePricing } = req.body;
+    const phoneModel = normalizeModelName(req.body.phoneModel);
 
     if (isSuperAdmin(req)) {
       // Direct Create for Super Admin
@@ -138,6 +159,9 @@ export const updateMobile = async (req, res) => {
         updates[field] = req.body[field];
       }
     });
+    if (updates.phoneModel !== undefined) {
+      updates.phoneModel = normalizeModelName(updates.phoneModel);
+    }
 
     if (isSuperAdmin(req)) {
       // Direct Update
