@@ -88,6 +88,7 @@ const categorySchema = new mongoose.Schema({
             capAt: { type: String, default: '' }, // cosmetic only: cap this question's own contribution at this grade letter
             forceGrade: { type: String, default: 'E' }, // display-defect only: grade forced when any defect is picked
             noneKey: { type: String, default: 'none' }, // display-defect / functional-checklist: the "no problem" option key
+            badKey: { type: String, default: 'fail' }, // functional only: which option key counts as a defect (e.g. 'fail' for pass/fail/unsure questions, 'yes' for "Has it had liquid damage?")
             options: {
                 type: [{
                     key: { type: String, required: true, trim: true, lowercase: true },

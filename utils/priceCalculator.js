@@ -109,7 +109,7 @@ export const computeGrade = (conditionAnswers, assessmentQuestions) => {
       const hasDefect = chosen.some((v) => v && v !== noneKey);
       if (hasDefect) grade = worstOf(grade, (question.forceGrade || 'E').toUpperCase());
     } else if (role === 'functional') {
-      if (answer === 'fail') functionalDefect = true;
+      if (answer === (question.badKey || 'fail')) functionalDefect = true;
     } else if (role === 'functional-checklist') {
       const noneKey = question.noneKey || 'none';
       const chosen = Array.isArray(answer) ? answer : [answer];
