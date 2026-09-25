@@ -24,24 +24,19 @@ export const GRADE_LABELS = {
   F: 'Heavily Damaged',
 };
 
-/**
- * Reduce a set of condition answers to a single letter grade, generically for any
- * category's question set.
- *
- * Each question's options array is treated as already ordered best -> worst (this is
- * how every category's assessmentQuestions are authored, e.g. screen: perfect,
- * scratched, cracked), so an option's index within its question IS its severity —
- * no separate severity field needed. We sum the chosen severities across every
- * question, normalize against the worst possible total, and bucket that ratio into
- * 6 equal bands (A..F).
- *
- * @param {Object} conditionAnswers - map of questionKey -> chosen optionKey
- * @param {Array} assessmentQuestions - the category's Category.assessmentQuestions
- * @returns {String} one of GRADES
- */
-export const computeGrade = (conditionAnswers, assessmentQuestions) => {
-  if (!assessmentQuestions || !assessmentQuestions.length) return 'C'; // no config — neutral fallback
+const RANK = Object.fromEntries(GRADES.map((g, i) => [g, i]));
 
+// Returns whichever of the two grade letters is worse (higher rank). Ignores anything
+// that isn't a real grade letter (defensive against bad/missing data).
+const worstOf = (current, candidate) => {
+  if (!candidate || !(candidate in RANK)) return current;
+  return RANK[candidate] > RANK[current] ? candidate : current;
+};
+
+// Legacy severity-index grading — kept only for a category that hasn't been migrated
+// to gradeRole-tagged questions yet (every option's index within its question is its
+// severity; sum across questions, normalize, bucket into 6 equal bands).
+const legacySeverityGrade = (conditionAnswers, assessmentQuestions) => {
   let totalSeverity = 0;
   let maxSeverity = 0;
 
@@ -54,16 +49,78 @@ export const computeGrade = (conditionAnswers, assessmentQuestions) => {
 
     const chosenKey = conditionAnswers ? conditionAnswers[question.key] : undefined;
     const chosenIndex = options.findIndex((o) => o.key === chosenKey);
-    // Unanswered/unrecognized question -> treat as worst case for that question
-    // (defensive: never lets a missing answer accidentally inflate the grade).
     totalSeverity += chosenIndex >= 0 ? chosenIndex : worstIndex;
   }
 
   if (maxSeverity === 0) return 'A';
+  const ratio = totalSeverity / maxSeverity;
+  return GRADES[Math.min(GRADES.length - 1, Math.floor(ratio * GRADES.length))];
+};
 
-  const ratio = totalSeverity / maxSeverity; // 0 (perfect) .. 1 (worst)
-  const gradeIndex = Math.min(GRADES.length - 1, Math.floor(ratio * GRADES.length));
-  return GRADES[gradeIndex];
+/**
+ * Reduce a set of condition answers to a single letter grade, generically for any
+ * category's question set, using each question's `gradeRole` (see categoryModel.js):
+ *
+ *  - 'cosmetic': the answer key IS a grade letter — worst-of across all cosmetic
+ *    questions wins. `capAt` limits how bad THIS question alone can push things
+ *    (e.g. a cracked back caps at 'C' even though a cracked screen would hit 'D').
+ *  - 'display-defect': multi-select; anything other than `noneKey` forces the grade
+ *    to at least `forceGrade`.
+ *  - 'functional' / 'functional-checklist': track a separate "something doesn't
+ *    work" flag rather than moving the grade directly.
+ *
+ * A functional defect floors the final grade at 'C' — a phone can look mint and
+ * still not be worth a mint price if it doesn't fully work, but a purely cosmetic
+ * issue never gets *better* than the functional floor makes it.
+ *
+ * If NONE of the category's questions declare a gradeRole (an older/unmigrated
+ * category), falls back to the legacy severity-index system for backward
+ * compatibility — same behavior as before this system existed.
+ *
+ * @param {Object} conditionAnswers - map of questionKey -> chosen optionKey (or, for
+ *   multi-select questions, an array of chosen optionKeys)
+ * @param {Array} assessmentQuestions - the category's Category.assessmentQuestions
+ * @returns {String} one of GRADES
+ */
+export const computeGrade = (conditionAnswers, assessmentQuestions) => {
+  if (!assessmentQuestions || !assessmentQuestions.length) return 'C'; // no config — neutral fallback
+
+  const isRoleBased = assessmentQuestions.some((q) => q.gradeRole && q.gradeRole !== 'cosmetic')
+    || assessmentQuestions.some((q) => q.gradeRole === 'cosmetic' && (q.options || []).some((o) => o.key.toUpperCase() in RANK));
+  if (!isRoleBased) return legacySeverityGrade(conditionAnswers, assessmentQuestions);
+
+  let grade = 'A';
+  let functionalDefect = false;
+
+  for (const question of assessmentQuestions) {
+    const role = question.gradeRole || 'cosmetic';
+    const answer = conditionAnswers ? conditionAnswers[question.key] : undefined;
+    if (!answer) continue;
+
+    if (role === 'cosmetic') {
+      let letter = String(answer).toUpperCase();
+      if (question.capAt && RANK[letter] > RANK[question.capAt.toUpperCase()]) {
+        letter = question.capAt.toUpperCase();
+      }
+      grade = worstOf(grade, letter);
+    } else if (role === 'display-defect') {
+      const noneKey = question.noneKey || 'none';
+      const chosen = Array.isArray(answer) ? answer : [answer];
+      const hasDefect = chosen.some((v) => v && v !== noneKey);
+      if (hasDefect) grade = worstOf(grade, (question.forceGrade || 'E').toUpperCase());
+    } else if (role === 'functional') {
+      if (answer === 'fail') functionalDefect = true;
+    } else if (role === 'functional-checklist') {
+      const noneKey = question.noneKey || 'none';
+      const chosen = Array.isArray(answer) ? answer : [answer];
+      const hasIssue = chosen.some((v) => v && v !== noneKey);
+      if (hasIssue) functionalDefect = true;
+    }
+  }
+
+  if (functionalDefect) grade = worstOf(grade, 'C');
+
+  return grade;
 };
 
 /**

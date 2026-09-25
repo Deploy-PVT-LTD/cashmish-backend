@@ -74,16 +74,25 @@ const resolvePrice = async ({ mobile, storage, carrier, answers, forcedGrade }) 
   }
 
   // Fallback: legacy percentage deduction, unchanged behavior for non-migrated
-  // products. If a grade was forced (e.g. "doesn't turn on"), synthesize a
-  // worst-answer-per-question set so the % system also lands on the worst price
-  // instead of accidentally quoting a mint-condition price for a dead phone.
-  const effectiveAnswers = validForcedGrade
-    ? Object.fromEntries(questions.map((q) => [q.key, q.options?.[q.options.length - 1]?.key]).filter(([, v]) => v))
-    : answers;
+  // products.
+  const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
+
+  if (validForcedGrade) {
+    // A forced grade means "this device is effectively worthless" (dead / account
+    // locked) — for a legacy (non-migrated) product we can't reliably synthesize
+    // "worst answer" values from the CURRENT category question set, because its
+    // keys (screen/back/frame/touch/camera/...) no longer necessarily match this
+    // specific product's own deductionRules keys (which may still be the older
+    // screen/body/battery shape, or something else entirely, per product). Rather
+    // than silently apply zero deduction when the keys don't line up, just apply
+    // the maximum discount the legacy system allows — the same 80% cap
+    // calculatePrice itself enforces for a fully-answered worst case.
+    const estimatedPrice = Math.round((activeBasePrice || 0) * 0.2);
+    return { estimatedPrice, grade };
+  }
 
   const effectiveRules = await buildEffectiveRules(mobile);
-  const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
-  const estimatedPrice = calculatePrice(activeBasePrice, { storage, ...effectiveAnswers }, effectiveRules);
+  const estimatedPrice = calculatePrice(activeBasePrice, { storage, ...answers }, effectiveRules);
   return { estimatedPrice, grade };
 };
 
