@@ -40,6 +40,18 @@ export const sendEmail = async (options) => {
   }
 };
 
+// Public site + logo used in the newer, branded templates below (SVG renders
+// fine in Gmail/Apple Mail; the "CashMish" text alt/heading covers Outlook,
+// which doesn't render SVG in emails).
+const SITE_URL = 'https://cashmish.com';
+const LOGO_URL = `${SITE_URL}/logo.svg`;
+
+const brandedHeader = () => `
+  <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #f1f1f1;">
+    <img src="${LOGO_URL}" alt="CashMish" height="36" style="height: 36px; display: inline-block;" />
+  </div>
+`;
+
 // Templates remain exactly the same as they return HTML strings
 export const getResetPasswordTemplate = (resetUrl, userName) => {
   return `
@@ -523,6 +535,94 @@ export const getPayoutSentTemplate = (userName, amount) => {
         <div class="footer">
           <p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p>
         </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+// ── Payment-flow templates (Submissions review → counter offer → shipping) ──
+
+// Sent the moment a price is confirmed for the customer to receive — either
+// the admin's counter offer exactly matched the system estimate, or the
+// customer just accepted a differing counter offer via the email below.
+export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labelUrl, trackingUrl } = {}) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff; }
+        .content { color: #34495e; line-height: 1.6; margin-top: 20px; }
+        .price-box { background-color: #27ae60; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; font-weight: bold; font-size: 22px; }
+        .details-box { background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .button-group { text-align: center; margin: 25px 0; }
+        .button { padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin: 6px; }
+        .btn-label { background-color: #16a34a; color: white !important; }
+        .btn-track { background-color: #2c3e50; color: white !important; }
+        .footer { text-align: center; font-size: 12px; color: #95a5a6; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${brandedHeader()}
+        <div class="content">
+          <p>Hello ${userName || 'there'},</p>
+          <p>Your price for <strong>${deviceName}</strong> is confirmed:</p>
+          <div class="price-box">$ ${amount}</div>
+          <div class="details-box">
+            <p style="margin: 0;">📦 Use the attached prepaid USPS label to ship your device to us — it's free.</p>
+            <p style="margin-top: 10px;">💰 You'll receive your payment <strong>within 48 hours of us receiving your device</strong>.</p>
+          </div>
+          ${(labelUrl || trackingUrl) ? `
+          <div class="button-group">
+            ${labelUrl ? `<a href="${labelUrl}" class="button btn-label">Download Shipping Label</a>` : ''}
+            ${trackingUrl ? `<a href="${trackingUrl}" class="button btn-track">Track Your Shipment</a>` : ''}
+          </div>
+          ` : ''}
+          <p>Thank you for choosing CashMish!</p>
+        </div>
+        <div class="footer"><p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p></div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+// Sent when the admin's counter offer differs from the system estimate — the
+// customer must actively accept it (no login, just this link) before
+// anything ships or gets paid.
+export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedPrice, counterOfferPrice, acceptUrl) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff; }
+        .content { color: #34495e; line-height: 1.6; margin-top: 20px; }
+        .price-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .offer-box { background-color: #f1c40f; color: #2c3e50; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; font-weight: bold; font-size: 22px; }
+        .button-group { text-align: center; margin: 30px 0; }
+        .button { padding: 14px 32px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; }
+        .btn-accept { background-color: #27ae60; color: white !important; }
+        .footer { text-align: center; font-size: 12px; color: #95a5a6; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${brandedHeader()}
+        <div class="content">
+          <p>Hello ${userName || 'there'},</p>
+          <p>We've inspected your <strong>${deviceName}</strong> submission. Based on its actual condition, we'd like to offer you a counter offer:</p>
+          <div class="offer-box">Counter Offer: $ ${counterOfferPrice}</div>
+          <p style="text-align: center; color: #7f8c8d; font-size: 14px;">(Original estimate was $ ${estimatedPrice})</p>
+          <p style="text-align: center;">Click below to accept this counter offer and receive your free shipping label:</p>
+          <div class="button-group">
+            <a href="${acceptUrl}" class="button btn-accept">Accept Counter Offer</a>
+          </div>
+          <p style="font-size: 13px; color: #7f8c8d;">If you have any questions about this offer, just reply to this email.</p>
+        </div>
+        <div class="footer"><p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p></div>
       </div>
     </body>
     </html>

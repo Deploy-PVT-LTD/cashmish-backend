@@ -27,7 +27,11 @@ const formSchema = new mongoose.Schema(
         },
       },
 
-      pickUpDate: { type: Date, required: true },
+      // No longer collected — the flow moved from "we pick it up" to "you ship it
+      // to us with a free prepaid USPS label" (see paymentMethod/label fields
+      // below). Kept optional (not required) so old submissions that DO have
+      // these still read back fine.
+      pickUpDate: { type: Date },
       timeSlot: {
         type: String,
         enum: [
@@ -36,7 +40,6 @@ const formSchema = new mongoose.Schema(
           "2:00 PM - 4:00 PM",
           "4:00 PM - 6:00 PM",
         ],
-        required: true,
       },
     },
 
@@ -71,9 +74,52 @@ const formSchema = new mongoose.Schema(
     images: [String],
 
     estimatedPrice: Number,
+    // Internally still "bidPrice" (unchanged DB field, avoids a data migration) —
+    // every customer/admin-facing surface calls this the "Counter Offer".
     bidPrice: { type: Number, default: 0 },
 
     status: { type: String, default: "pending" },
+
+    // ── How the customer wants to be paid — chosen right after "Confirm Pickup",
+    // before the submission ever reaches the admin review queue. ──────────────
+    paymentMethod: { type: String, enum: ["zelle", "bank"] },
+    zelleDetails: {
+      contact: { type: String }, // email or phone, per contactType
+      contactType: { type: String, enum: ["email", "phone"] },
+    },
+    bankAccountDetails: {
+      accountHolderName: { type: String },
+      routingNumber: { type: String },
+      accountNumber: { type: String },
+      accountType: { type: String, enum: ["checking", "savings"] },
+    },
+
+    // ── Counter-offer negotiation & shipping (admin side) ──────────────────────
+    // 'none' — no counter offer set yet.
+    // 'matches_estimate' — admin's price equalled the system estimate; customer
+    //   was simply notified (no acceptance needed).
+    // 'pending_acceptance' — admin's price differs; waiting on the customer to
+    //   accept via the emailed link.
+    // 'accepted' — customer accepted a differing counter offer.
+    counterOfferStatus: {
+      type: String,
+      enum: ["none", "matches_estimate", "pending_acceptance", "accepted"],
+      default: "none",
+    },
+    // Secret token embedded in the "accept this offer" email link — looked up
+    // with no login required, so it must be unguessable.
+    counterOfferToken: { type: String },
+    counterOfferRespondedAt: { type: Date },
+    // Flips to false the moment a customer accepts a differing counter offer,
+    // so the admin Submissions page can pop up their bank/Zelle details once —
+    // set back to true once the admin has seen it.
+    acceptanceSeenByAdmin: { type: Boolean, default: true },
+
+    // Admin-uploaded (manually, from an outside USPS account) prepaid return
+    // shipping label — number for the tracking link, PDF for the customer to
+    // print and use.
+    uspsLabelNumber: { type: String },
+    uspsLabelUrl: { type: String },
 
     submissionId: { type: Number, unique: true, sparse: true },
     isDeleted: { type: Boolean, default: false },

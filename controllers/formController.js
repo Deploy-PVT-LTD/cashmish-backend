@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Form } from "../models/formModel.js";
 import { Counter } from "../models/counterModel.js";
 import { Mobile } from "../models/mobileModel.js";
@@ -14,7 +15,9 @@ import {
   getFormConfirmationTemplate,
   getBidStatusTemplate,
   getAdminBidOfferTemplate,
-  getAcceptPriceTemplate
+  getAcceptPriceTemplate,
+  getPaymentConfirmedTemplate,
+  getCounterOfferProposalTemplate
 } from "../utils/emailService.js";
 import {
   sendSMS,
@@ -109,16 +112,31 @@ export const createForm = async (req, res) => {
       batteryCondition,
       forcedGrade,
       pickUpDetails,
-      userId
+      userId,
+      paymentMethod,
+      zelleDetails,
+      bankAccountDetails
     } = req.body;
 
     if (typeof pickUpDetails === "string") {
       pickUpDetails = JSON.parse(pickUpDetails);
     }
+    if (typeof zelleDetails === "string") {
+      zelleDetails = zelleDetails ? JSON.parse(zelleDetails) : undefined;
+    }
+    if (typeof bankAccountDetails === "string") {
+      bankAccountDetails = bankAccountDetails ? JSON.parse(bankAccountDetails) : undefined;
+    }
 
     // Validation
     if (!mobileId || !pickUpDetails?.phoneNumber) {
       return res.status(400).json({ message: "Required fields missing" });
+    }
+    if (paymentMethod === "zelle" && !zelleDetails?.contact) {
+      return res.status(400).json({ message: "Zelle contact info is required" });
+    }
+    if (paymentMethod === "bank" && (!bankAccountDetails?.accountHolderName || !bankAccountDetails?.routingNumber || !bankAccountDetails?.accountNumber)) {
+      return res.status(400).json({ message: "Bank account details are incomplete" });
     }
 
     const mobile = await Mobile.findById(mobileId);
@@ -168,6 +186,9 @@ export const createForm = async (req, res) => {
       images: imageUrls,
       estimatedPrice,
       pickUpDetails,
+      paymentMethod,
+      ...(paymentMethod === 'zelle' && { zelleDetails }),
+      ...(paymentMethod === 'bank' && { bankAccountDetails }),
       status: 'pending',
       bidPrice: 0
     };
@@ -418,6 +439,182 @@ export const updateForm = async (req, res) => {
   } catch (error) {
     console.error("❌ Update form error:", error);
     res.status(500).json({ message: "Update failed", error: error.message });
+  }
+};
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://cashmish.com';
+const uspsTrackingUrl = (labelNumber) =>
+  labelNumber ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(labelNumber)}` : null;
+
+// ── Admin: set the counter offer + (optionally) the USPS return label. ──────
+// If the price matches the system estimate, the customer is simply notified
+// (nothing to accept). If it differs, the customer must accept it via the
+// emailed link before anything is considered final.
+export const setCounterOffer = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
+
+    const finalizedStatuses = ['accepted', 'paid', 'rejected'];
+    if (finalizedStatuses.includes(form.status)) {
+      return res.status(400).json({ message: `Cannot update a ${form.status} submission.` });
+    }
+
+    const { bidPrice, uspsLabelNumber } = req.body;
+    if (bidPrice === undefined || bidPrice === null || bidPrice === '') {
+      return res.status(400).json({ message: "Counter offer amount is required" });
+    }
+
+    // Label PDF (optional on this call if one was already uploaded earlier —
+    // e.g. admin is only correcting the price).
+    if (req.file) {
+      const uploaded = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "shipping-labels", resource_type: "raw", format: "pdf" },
+          (err, result) => (err ? reject(err) : resolve(result))
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+      form.uspsLabelUrl = uploaded.secure_url;
+    }
+    if (uspsLabelNumber) form.uspsLabelNumber = uspsLabelNumber;
+
+    form.bidPrice = Number(bidPrice);
+    form.status = 'bid_placed';
+
+    const matchesEstimate = Number(bidPrice) === Number(form.estimatedPrice);
+    let emailJob = null;
+
+    if (matchesEstimate) {
+      form.counterOfferStatus = 'matches_estimate';
+      form.counterOfferToken = undefined;
+      emailJob = { kind: 'confirmed' };
+    } else {
+      form.counterOfferStatus = 'pending_acceptance';
+      form.counterOfferToken = crypto.randomBytes(24).toString('hex');
+      emailJob = { kind: 'proposal' };
+    }
+
+    await form.save();
+    await form.populate('mobileId');
+    await form.populate('userId', 'name email phoneNumber');
+
+    res.json(form);
+
+    // Fire-and-forget email
+    const email = form.pickUpDetails?.email || form.userId?.email;
+    if (email) {
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+      const name = form.pickUpDetails?.fullName;
+
+      let subject, html;
+      if (emailJob.kind === 'confirmed') {
+        subject = 'Your CashMish Price Is Confirmed';
+        html = getPaymentConfirmedTemplate(name, deviceName, form.bidPrice, {
+          labelUrl: form.uspsLabelUrl,
+          trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
+        });
+      } else {
+        subject = 'A Counter Offer for Your Device - CashMish';
+        html = getCounterOfferProposalTemplate(
+          name,
+          deviceName,
+          form.estimatedPrice,
+          form.bidPrice,
+          `${FRONTEND_URL}/offer/${form.counterOfferToken}`
+        );
+      }
+
+      sendEmail({ email, subject, html }).catch((err) =>
+        console.error("📧 Non-blocking email error (Counter Offer):", err.message)
+      );
+    }
+  } catch (error) {
+    console.error("❌ Set counter offer error:", error);
+    res.status(500).json({ message: "Failed to set counter offer", error: error.message });
+  }
+};
+
+// ── Public: fetch a counter offer by its emailed token (no login) ──────────
+export const getOfferByToken = async (req, res) => {
+  try {
+    const form = await Form.findOne({ counterOfferToken: req.params.token }).populate('mobileId');
+    if (!form) return res.status(404).json({ message: "Offer not found or already resolved" });
+
+    res.json({
+      deviceName: `${form.mobileId?.brand || ''} ${form.mobileId?.phoneModel || ''}`.trim(),
+      storage: form.storage,
+      estimatedPrice: form.estimatedPrice,
+      counterOfferPrice: form.bidPrice,
+      status: form.counterOfferStatus,
+      fullName: form.pickUpDetails?.fullName,
+    });
+  } catch (error) {
+    console.error("❌ Get offer by token error:", error);
+    res.status(500).json({ message: "Failed to fetch offer" });
+  }
+};
+
+// ── Public: customer accepts a differing counter offer via the emailed link.
+export const acceptCounterOffer = async (req, res) => {
+  try {
+    const form = await Form.findOne({ counterOfferToken: req.params.token });
+    if (!form) return res.status(404).json({ message: "Offer not found or already resolved" });
+
+    if (form.counterOfferStatus === 'accepted') {
+      return res.json({ message: "Already accepted", alreadyAccepted: true });
+    }
+
+    form.status = 'accepted';
+    form.counterOfferStatus = 'accepted';
+    form.counterOfferRespondedAt = new Date();
+    form.acceptanceSeenByAdmin = false;
+    await form.save();
+
+    // Mirror updateForm's wallet sync for logged-in users.
+    if (form.userId) {
+      const amount = parseFloat(form.bidPrice) || 0;
+      await Wallet.findOneAndUpdate(
+        { userId: form.userId },
+        { $inc: { balance: amount, totalEarnings: amount } },
+        { upsert: true, new: true }
+      );
+    }
+
+    await form.populate('mobileId');
+    res.json({ message: "Counter offer accepted" });
+
+    const email = form.pickUpDetails?.email;
+    if (email) {
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+      const html = getPaymentConfirmedTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, {
+        labelUrl: form.uspsLabelUrl,
+        trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
+      });
+      sendEmail({
+        email,
+        subject: 'Your CashMish Price Is Confirmed',
+        html,
+      }).catch((err) => console.error("📧 Non-blocking email error (Offer Accepted):", err.message));
+    }
+  } catch (error) {
+    console.error("❌ Accept counter offer error:", error);
+    res.status(500).json({ message: "Failed to accept offer" });
+  }
+};
+
+// ── Admin: dismiss the "customer accepted" popup for one submission. ───────
+export const ackAcceptance = async (req, res) => {
+  try {
+    const form = await Form.findByIdAndUpdate(
+      req.params.id,
+      { acceptanceSeenByAdmin: true },
+      { new: true }
+    );
+    if (!form) return res.status(404).json({ message: "Form not found" });
+    res.json({ message: "Acknowledged" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to acknowledge" });
   }
 };
 
