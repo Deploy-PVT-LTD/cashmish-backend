@@ -7,7 +7,7 @@ const isSuperAdmin = (req) => req.user && req.user.role === 'superadmin';
 //   ADD MOBILE (ADMIN/SUPERADMIN)
 export const addMobile = async (req, res) => {
   try {
-    const { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules } = req.body;
+    const { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules, gradePricing } = req.body;
 
     if (isSuperAdmin(req)) {
       // Direct Create for Super Admin
@@ -18,14 +18,15 @@ export const addMobile = async (req, res) => {
         basePrice,
         basePriceLocked,
         image,
-        deductionRules
+        deductionRules,
+        gradePricing
       });
       return res.status(201).json(mobile);
     } else {
       // Create Request for Admin
       const request = await MobileRequest.create({
         type: 'CREATE',
-        data: { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules },
+        data: { category, brand, phoneModel, basePrice, basePriceLocked, image, deductionRules, gradePricing },
         requestedBy: req.user._id
       });
       return res.status(200).json({ message: "Request submitted for approval", request });
@@ -129,7 +130,7 @@ export const getMobilesByBrand = async (req, res) => {
 export const updateMobile = async (req, res) => {
   try {
     const updates = {};
-    const fields = ["category", "brand", "phoneModel", "basePrice", "basePriceLocked", "isActive", "image", "deductionRules"];
+    const fields = ["category", "brand", "phoneModel", "basePrice", "basePriceLocked", "isActive", "image", "deductionRules", "gradePricing"];
 
     fields.forEach(field => {
       if (req.body[field] !== undefined) {

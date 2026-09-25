@@ -35,12 +35,34 @@ const mobileSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
-    // Generic map of questionKey -> { optionKey: percentDeduction }, matching whatever
-    // Category.assessmentQuestions defines for this product's category. Kept as Mixed
-    // (rather than a fixed screen/body/battery sub-schema) so any category's question
-    // set can be stored the same way — existing {screen,body,battery} data reads back
-    // identically under Mixed, no migration needed.
+    // LEGACY percentage-deduction system. Kept (not removed/migrated) purely as a
+    // fallback: any product that has no gradePricing configured yet (e.g. a brand
+    // not covered by a grade-price import, or a category still being set up) keeps
+    // pricing exactly as before — zero regression. New/updated products should use
+    // gradePricing below instead; the estimate calculator always prefers it.
     deductionRules: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
+    },
+    // Grade-wise price table — the current pricing system. Customers no longer get a
+    // percentage knocked off a base price; instead the condition answers they give are
+    // reduced to a single letter grade (A = best … F = worst, see
+    // utils/priceCalculator.js#computeGrade) and that grade is looked up here directly
+    // for an exact dollar amount, split by storage size and lock status.
+    //
+    // Shape:
+    //   {
+    //     "<storageKey or 'default'>": {
+    //       unlockedBase: Number,   // reference/"worth up to" price, informational only
+    //       lockedBase: Number,
+    //       unlocked: { A: Number, B: Number, C: Number, D: Number, E: Number, F: Number },
+    //       locked:   { A: Number, B: Number, C: Number, D: Number, E: Number, F: Number }
+    //     }, ...
+    //   }
+    // Categories without a storage step (hasStorageStep: false) just use the single
+    // key "default". Kept as Mixed for the same reason as deductionRules — works for
+    // any category's storage options without a schema change per category.
+    gradePricing: {
         type: mongoose.Schema.Types.Mixed,
         default: {}
     }

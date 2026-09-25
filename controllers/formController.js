@@ -1,12 +1,13 @@
 import { Form } from "../models/formModel.js";
 import { Counter } from "../models/counterModel.js";
 import { Mobile } from "../models/mobileModel.js";
+import { Category } from "../models/categoryModel.js";
 import { User } from "../models/userModel.js";
 import { Inventory } from "../models/inventoryModel.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { PriceConfig } from "../models/priceConfigModel.js";
-import { calculatePrice } from "../utils/priceCalculator.js";
+import { calculatePrice, computeGrade, calculateGradePrice, GRADES } from "../utils/priceCalculator.js";
 import { Wallet } from "../models/walletModel.js";
 import {
   sendEmail,
@@ -51,6 +52,41 @@ const resolveConditionAnswers = ({ conditionAnswers, screenCondition, bodyCondit
   return answers;
 };
 
+// Grade-based pricing (current system) with a fallback to the legacy percentage
+// system for any product that doesn't have gradePricing configured yet — see
+// utils/priceCalculator.js for both.
+//
+// `forcedGrade` overrides the computed grade entirely — used for the "doesn't turn
+// on" gate question (Conditionselection.jsx), which skips every other condition
+// question and always prices at a fixed grade.
+const resolvePrice = async ({ mobile, storage, carrier, answers, forcedGrade }) => {
+  const isLocked = Boolean(carrier && carrier.toLowerCase() !== 'unlocked');
+
+  const category = await Category.findOne({ slug: mobile.category });
+  const questions = category ? category.assessmentQuestions : [];
+
+  const validForcedGrade = GRADES.includes(forcedGrade) ? forcedGrade : null;
+  const grade = validForcedGrade || computeGrade(answers, questions);
+
+  const gradePrice = calculateGradePrice(mobile, storage, isLocked, grade);
+  if (gradePrice !== null) {
+    return { estimatedPrice: gradePrice, grade };
+  }
+
+  // Fallback: legacy percentage deduction, unchanged behavior for non-migrated
+  // products. If a grade was forced (e.g. "doesn't turn on"), synthesize a
+  // worst-answer-per-question set so the % system also lands on the worst price
+  // instead of accidentally quoting a mint-condition price for a dead phone.
+  const effectiveAnswers = validForcedGrade
+    ? Object.fromEntries(questions.map((q) => [q.key, q.options?.[q.options.length - 1]?.key]).filter(([, v]) => v))
+    : answers;
+
+  const effectiveRules = await buildEffectiveRules(mobile);
+  const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
+  const estimatedPrice = calculatePrice(activeBasePrice, { storage, ...effectiveAnswers }, effectiveRules);
+  return { estimatedPrice, grade };
+};
+
 export const createForm = async (req, res) => {
   try {
     let {
@@ -62,6 +98,7 @@ export const createForm = async (req, res) => {
       screenCondition,
       bodyCondition,
       batteryCondition,
+      forcedGrade,
       pickUpDetails,
       userId
     } = req.body;
@@ -102,19 +139,8 @@ export const createForm = async (req, res) => {
       }
     }
 
-    // Get pricing rules
-    const effectiveRules = await buildEffectiveRules(mobile);
     const answers = resolveConditionAnswers({ conditionAnswers, screenCondition, bodyCondition, batteryCondition });
-
-    // Calculate estimated price
-    const isLocked = carrier && carrier.toLowerCase() !== 'unlocked';
-    const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
-
-    const estimatedPrice = calculatePrice(
-      activeBasePrice,
-      { storage, ...answers },
-      effectiveRules
-    );
+    const { estimatedPrice, grade } = await resolvePrice({ mobile, storage, carrier, answers, forcedGrade });
 
     // Prepare form data
     const formData = {
@@ -123,6 +149,7 @@ export const createForm = async (req, res) => {
       carrier,
       condition,
       conditionAnswers: answers,
+      grade,
       // Legacy mirrors kept for any admin page/export still reading these directly —
       // populated automatically whenever the category's questions use these exact
       // keys (as Mobile Phones does); simply absent for other categories.
@@ -205,6 +232,7 @@ export const getEstimate = async (req, res) => {
       screenCondition,
       bodyCondition,
       batteryCondition,
+      forcedGrade,
     } = req.body;
 
     if (!mobileId) {
@@ -214,21 +242,10 @@ export const getEstimate = async (req, res) => {
     const mobile = await Mobile.findById(mobileId);
     if (!mobile) return res.status(404).json({ message: "Mobile not found" });
 
-    // Get pricing rules
-    const effectiveRules = await buildEffectiveRules(mobile);
     const answers = resolveConditionAnswers({ conditionAnswers, screenCondition, bodyCondition, batteryCondition });
+    const { estimatedPrice, grade } = await resolvePrice({ mobile, storage, carrier, answers, forcedGrade });
 
-    // Calculate estimated price
-    const isLocked = carrier && carrier.toLowerCase() !== 'unlocked';
-    const activeBasePrice = isLocked && mobile.basePriceLocked ? mobile.basePriceLocked : mobile.basePrice;
-
-    const estimatedPrice = calculatePrice(
-      activeBasePrice,
-      { storage, ...answers },
-      effectiveRules
-    );
-
-    res.json({ estimatedPrice });
+    res.json({ estimatedPrice, grade });
   } catch (error) {
     console.error("❌ Estimate calculation error:", error);
     res.status(500).json({ message: "Estimate calculation failed", error: error.message });

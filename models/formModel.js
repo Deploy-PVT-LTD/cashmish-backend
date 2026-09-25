@@ -56,6 +56,11 @@ const formSchema = new mongoose.Schema(
     // category (Category.assessmentQuestions). Works for any category's question set.
     conditionAnswers: { type: mongoose.Schema.Types.Mixed, default: {} },
 
+    // Letter grade (A-F) the system derived from conditionAnswers — see
+    // utils/priceCalculator.js#computeGrade. Not required: older forms submitted
+    // before grade-based pricing existed simply won't have one.
+    grade: { type: String },
+
     // Legacy mirrors of conditionAnswers.screen/body/battery — kept optional (not
     // every category has these specific questions) so older admin pages/exports that
     // read them directly keep working for Mobile Phones without any changes.
