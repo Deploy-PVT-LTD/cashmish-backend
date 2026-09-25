@@ -78,6 +78,7 @@ const categorySchema = new mongoose.Schema({
             key: { type: String, required: true, trim: true, lowercase: true },
             label: { type: String, required: true, trim: true },
             subtitle: { type: String, default: '', trim: true }, // shown under the label on the assessment page
+            tip: { type: String, default: '', trim: true }, // optional helper callout shown below the subtitle
             gradeRole: {
                 type: String,
                 enum: ['cosmetic', 'display-defect', 'functional', 'functional-checklist'],
