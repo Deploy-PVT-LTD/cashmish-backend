@@ -1,11 +1,16 @@
-import { addMobile, getMobileById, getMobiles, updateMobile, deleteMobile, getMobilesByBrand, getMobileRequests, approveRequest, rejectRequest } from "../controllers/mobileController.js";
+import { addMobile, getMobileById, getMobiles, updateMobile, deleteMobile, getMobilesByBrand, getMobileRequests, approveRequest, rejectRequest, bulkImportGradePricing } from "../controllers/mobileController.js";
 import express from "express";
 import passport from "passport";
+import uploadExcel from "../middleware/uploadExcel.js";
 
 const router = express.Router();
 const requireAuth = passport.authenticate("jwt", { session: false });
 
 router.post("/", requireAuth, addMobile);
+
+// BULK GRADE-PRICE IMPORT (Excel/CSV upload) — before "/:id" so it isn't
+// swallowed by that param route.
+router.post("/bulk-import-grades", requireAuth, uploadExcel.single("file"), bulkImportGradePricing);
 
 //  GET ALL
 router.get("/", getMobiles);
