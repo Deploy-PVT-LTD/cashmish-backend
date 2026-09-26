@@ -510,22 +510,27 @@ export const shipLabel = async (req, res) => {
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    res.json(form);
-
+    // Awaited (not fire-and-forget) so a failure is visible to the admin
+    // right in the response, instead of only in a server log nobody sees.
+    let emailSent = false, emailError = null;
     const email = form.pickUpDetails?.email || form.userId?.email;
     if (email) {
-      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-      const html = getLabelSentTemplate(form.pickUpDetails?.fullName, deviceName, form.estimatedPrice, {
-        labelUrl: form.uspsLabelUrl,
-        labelNumber: form.uspsLabelNumber,
-        trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
-      });
-      sendEmail({
-        email,
-        subject: 'Your CashMish Shipping Label Is Ready',
-        html,
-      }).catch((err) => console.error("📧 Non-blocking email error (Label Sent):", err.message));
+      try {
+        const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+        const html = getLabelSentTemplate(form.pickUpDetails?.fullName, deviceName, form.estimatedPrice, {
+          labelUrl: form.uspsLabelUrl,
+          labelNumber: form.uspsLabelNumber,
+          trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
+        });
+        await sendEmail({ email, subject: 'Your CashMish Shipping Label Is Ready', html });
+        emailSent = true;
+      } catch (err) {
+        console.error("📧 Email error (Label Sent):", err.message);
+        emailError = err.message;
+      }
     }
+
+    res.json({ ...form.toObject(), emailSent, emailError });
   } catch (error) {
     console.error("❌ Ship label error:", error);
     res.status(500).json({ message: "Failed to ship label", error: error.message });
@@ -572,18 +577,21 @@ export const confirmMatchAndPay = async (req, res) => {
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    res.json(form);
-
+    let emailSent = false, emailError = null;
     const email = form.pickUpDetails?.email || form.userId?.email;
     if (email) {
-      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-      const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
-      sendEmail({
-        email,
-        subject: 'Payment Sent - CashMish',
-        html,
-      }).catch((err) => console.error("📧 Non-blocking email error (Payment Sent):", err.message));
+      try {
+        const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+        const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
+        await sendEmail({ email, subject: 'Payment Sent - CashMish', html });
+        emailSent = true;
+      } catch (err) {
+        console.error("📧 Email error (Payment Sent):", err.message);
+        emailError = err.message;
+      }
     }
+
+    res.json({ ...form.toObject(), emailSent, emailError });
   } catch (error) {
     console.error("❌ Confirm match & pay error:", error);
     res.status(500).json({ message: "Failed to confirm and pay", error: error.message });
@@ -618,25 +626,28 @@ export const setCounterOffer = async (req, res) => {
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    res.json(form);
-
+    let emailSent = false, emailError = null;
     const email = form.pickUpDetails?.email || form.userId?.email;
     if (email) {
-      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-      const html = getCounterOfferProposalTemplate(
-        form.pickUpDetails?.fullName,
-        deviceName,
-        form.estimatedPrice,
-        form.bidPrice,
-        form.counterOfferReason,
-        `${FRONTEND_URL}/offer/${form.counterOfferToken}`
-      );
-      sendEmail({
-        email,
-        subject: 'A Counter Offer for Your Device - CashMish',
-        html,
-      }).catch((err) => console.error("📧 Non-blocking email error (Counter Offer):", err.message));
+      try {
+        const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+        const html = getCounterOfferProposalTemplate(
+          form.pickUpDetails?.fullName,
+          deviceName,
+          form.estimatedPrice,
+          form.bidPrice,
+          form.counterOfferReason,
+          `${FRONTEND_URL}/offer/${form.counterOfferToken}`
+        );
+        await sendEmail({ email, subject: 'A Counter Offer for Your Device - CashMish', html });
+        emailSent = true;
+      } catch (err) {
+        console.error("📧 Email error (Counter Offer):", err.message);
+        emailError = err.message;
+      }
     }
+
+    res.json({ ...form.toObject(), emailSent, emailError });
   } catch (error) {
     console.error("❌ Set counter offer error:", error);
     res.status(500).json({ message: "Failed to set counter offer", error: error.message });
@@ -659,18 +670,21 @@ export const markPaid = async (req, res) => {
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    res.json(form);
-
+    let emailSent = false, emailError = null;
     const email = form.pickUpDetails?.email || form.userId?.email;
     if (email) {
-      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-      const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
-      sendEmail({
-        email,
-        subject: 'Payment Sent - CashMish',
-        html,
-      }).catch((err) => console.error("📧 Non-blocking email error (Payment Sent):", err.message));
+      try {
+        const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+        const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
+        await sendEmail({ email, subject: 'Payment Sent - CashMish', html });
+        emailSent = true;
+      } catch (err) {
+        console.error("📧 Email error (Payment Sent):", err.message);
+        emailError = err.message;
+      }
     }
+
+    res.json({ ...form.toObject(), emailSent, emailError });
   } catch (error) {
     console.error("❌ Mark paid error:", error);
     res.status(500).json({ message: "Failed to mark as paid", error: error.message });
