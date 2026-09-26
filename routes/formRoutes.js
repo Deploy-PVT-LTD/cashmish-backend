@@ -11,7 +11,11 @@ import {
   getDashboardStats,
   getEstimate,
   bridgeGuestOrders,
+  shipLabel,
+  markReceived,
+  confirmMatchAndPay,
   setCounterOffer,
+  markPaid,
   getOfferByToken,
   acceptCounterOffer,
   ackAcceptance,
@@ -44,8 +48,13 @@ router.get("/wallet-balance/:userId", getWalletBalance);
 router.post("/guest-balance", getGuestWalletBalance);
 router.post("/bridge", bridgeGuestOrders);
 
-// Admin — set the counter offer + upload the USPS return label PDF.
-router.put("/:id/counter-offer", requireAuth, uploadLabel.single("label"), setCounterOffer);
+// Admin — submission lifecycle: ship label -> mark received -> either
+// confirm-and-pay directly, or send a reasoned counter offer -> mark paid.
+router.put("/:id/ship-label", requireAuth, uploadLabel.single("label"), shipLabel);
+router.put("/:id/mark-received", requireAuth, markReceived);
+router.put("/:id/confirm-paid", requireAuth, confirmMatchAndPay);
+router.put("/:id/counter-offer", requireAuth, setCounterOffer);
+router.put("/:id/mark-paid", requireAuth, markPaid);
 router.put("/:id/ack-acceptance", requireAuth, ackAcceptance);
 
 router.get("/:id", getFormById);

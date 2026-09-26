@@ -110,6 +110,10 @@ const formSchema = new mongoose.Schema(
     // with no login required, so it must be unguessable.
     counterOfferToken: { type: String },
     counterOfferRespondedAt: { type: Date },
+    // Free-text explanation the admin gives when the counter offer differs
+    // from the estimate (e.g. "you said the battery was at 80%, but it
+    // needs servicing") — shown to the customer in the counter-offer email.
+    counterOfferReason: { type: String },
     // Flips to false the moment a customer accepts a differing counter offer,
     // so the admin Submissions page can pop up their bank/Zelle details once —
     // set back to true once the admin has seen it.

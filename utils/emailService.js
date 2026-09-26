@@ -543,10 +543,11 @@ export const getPayoutSentTemplate = (userName, amount) => {
 
 // ── Payment-flow templates (Submissions review → counter offer → shipping) ──
 
-// Sent the moment a price is confirmed for the customer to receive — either
-// the admin's counter offer exactly matched the system estimate, or the
-// customer just accepted a differing counter offer via the email below.
-export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labelUrl, labelNumber, trackingUrl } = {}) => {
+// Stage 1 — sent the moment the admin ships the USPS label, right when the
+// submission comes in (before the device has actually been received or
+// inspected). Deliberately conditional/provisional language: this is what
+// the customer is ON TRACK to receive, not a done deal yet.
+export const getLabelSentTemplate = (userName, deviceName, estimatedPrice, { labelUrl, labelNumber, trackingUrl } = {}) => {
   return `
     <!DOCTYPE html>
     <html>
@@ -568,12 +569,13 @@ export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labe
         ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'there'},</p>
-          <p>Your price for <strong>${deviceName}</strong> is confirmed:</p>
-          <div class="price-box">$ ${amount}</div>
+          <p>Your shipping label for <strong>${deviceName}</strong> is ready. Based on the condition you described, here's what you're on track to receive:</p>
+          <div class="price-box">$ ${estimatedPrice}</div>
           <div class="details-box">
             <p style="margin: 0;">📦 Use the attached prepaid USPS label to ship your device to us — it's free.</p>
             ${labelNumber ? `<p style="margin-top: 10px;">🔖 USPS Tracking Number: <strong>${labelNumber}</strong></p>` : ''}
-            <p style="margin-top: 10px;">💰 You'll receive your payment <strong>within 48 hours of us receiving your device</strong>.</p>
+            <p style="margin-top: 10px;">✅ If your device matches exactly what you told us, <strong>you'll receive this payment within 48 hours of us receiving it</strong>.</p>
+            <p style="margin-top: 10px;">If anything doesn't match (for example, a condition detail we find during inspection), we'll email you a revised offer with the reason — you'll always get to accept or decline before anything is final.</p>
           </div>
           ${(labelUrl || trackingUrl) ? `
           <div class="button-group">
@@ -590,10 +592,11 @@ export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labe
   `;
 };
 
-// Sent when the admin's counter offer differs from the system estimate — the
-// customer must actively accept it (no login, just this link) before
-// anything ships or gets paid.
-export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedPrice, counterOfferPrice, acceptUrl) => {
+// Stage 3b — sent when the admin's inspection of the physical device turns
+// up a mismatch with what the customer declared. Always includes the reason
+// so the customer understands exactly why the offer changed, and must
+// actively accept it (no login, just this link) before anything is paid.
+export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedPrice, counterOfferPrice, reason, acceptUrl) => {
   return `
     <!DOCTYPE html>
     <html>
@@ -601,7 +604,7 @@ export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedP
       <style>
         .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff; }
         .content { color: #34495e; line-height: 1.6; margin-top: 20px; }
-        .price-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .reason-box { background-color: #fdf2e9; border-left: 4px solid #e67e22; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .offer-box { background-color: #f1c40f; color: #2c3e50; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; font-weight: bold; font-size: 22px; }
         .button-group { text-align: center; margin: 30px 0; }
         .button { padding: 14px 32px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; }
@@ -614,14 +617,48 @@ export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedP
         ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'there'},</p>
-          <p>We've inspected your <strong>${deviceName}</strong> submission. Based on its actual condition, we'd like to offer you a counter offer:</p>
+          <p>We've received and inspected your <strong>${deviceName}</strong>. Here's what we found:</p>
+          <div class="reason-box"><p style="margin: 0;">${reason}</p></div>
+          <p>Because of this, we're offering you a revised price instead of the original estimate:</p>
           <div class="offer-box">Counter Offer: $ ${counterOfferPrice}</div>
           <p style="text-align: center; color: #7f8c8d; font-size: 14px;">(Original estimate was $ ${estimatedPrice})</p>
-          <p style="text-align: center;">Click below to accept this counter offer and receive your free shipping label:</p>
+          <p style="text-align: center;">If you accept, you'll receive this payment shortly after:</p>
           <div class="button-group">
             <a href="${acceptUrl}" class="button btn-accept">Accept Counter Offer</a>
           </div>
           <p style="font-size: 13px; color: #7f8c8d;">If you have any questions about this offer, just reply to this email.</p>
+        </div>
+        <div class="footer"><p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p></div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+// Stage 4 (final) — sent the moment the admin has actually sent the money,
+// whether that was a direct match (stage 3a) or an accepted counter offer.
+export const getPaymentSentTemplate = (userName, deviceName, amount, paymentMethod) => {
+  const methodText = paymentMethod === 'zelle' ? 'Zelle' : paymentMethod === 'bank' ? 'your bank account' : 'your selected payment method';
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff; }
+        .content { color: #34495e; line-height: 1.6; margin-top: 20px; }
+        .price-box { background-color: #27ae60; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; font-weight: bold; font-size: 22px; }
+        .footer { text-align: center; font-size: 12px; color: #95a5a6; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${brandedHeader()}
+        <div class="content">
+          <p>Hello ${userName || 'there'},</p>
+          <p>Great news — your payment for <strong>${deviceName}</strong> has been sent to ${methodText}:</p>
+          <div class="price-box">$ ${amount}</div>
+          <p>It may take a little time to reflect depending on your bank/Zelle's processing time.</p>
+          <p>Thank you for choosing CashMish!</p>
         </div>
         <div class="footer"><p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p></div>
       </div>

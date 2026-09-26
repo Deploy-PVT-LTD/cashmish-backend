@@ -16,7 +16,8 @@ import {
   getBidStatusTemplate,
   getAdminBidOfferTemplate,
   getAcceptPriceTemplate,
-  getPaymentConfirmedTemplate,
+  getLabelSentTemplate,
+  getPaymentSentTemplate,
   getCounterOfferProposalTemplate
 } from "../utils/emailService.js";
 import {
@@ -446,66 +447,64 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'https://cashmish.com';
 const uspsTrackingUrl = (labelNumber) =>
   labelNumber ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(labelNumber)}` : null;
 
-// ── Admin: set the counter offer + (optionally) the USPS return label. ──────
-// If the price matches the system estimate, the customer is simply notified
-// (nothing to accept). If it differs, the customer must accept it via the
-// emailed link before anything is considered final.
-export const setCounterOffer = async (req, res) => {
+/**
+ * Submission lifecycle (status field), in order:
+ *   pending -> in_transit -> received -> [accepted ->] paid
+ *                                \-> rejected (can happen at any open stage)
+ *
+ * 'received' is where the admin, having now physically inspected the device,
+ * branches into one of two admin actions:
+ *   - confirmMatchAndPay: device matches what was declared -> straight to paid.
+ *   - setCounterOffer: it doesn't -> customer must accept a revised price
+ *     (with a reason) before anything is paid; acceptance moves status to
+ *     'accepted', and a separate markPaid call (once the admin has actually
+ *     sent the money) moves it to 'paid'.
+ *
+ * counterOfferStatus is a secondary flag that only matters once 'received'.
+ */
+
+// ── Admin, stage 1: ship the USPS return label the moment a submission comes
+// in — a provisional email goes out with it ("if your device matches what
+// you told us, you'll be paid within 48 hours of us receiving it").
+export const shipLabel = async (req, res) => {
   try {
     const form = await Form.findById(req.params.id);
     if (!form) return res.status(404).json({ message: "Form not found" });
 
-    const finalizedStatuses = ['accepted', 'paid', 'rejected'];
-    if (finalizedStatuses.includes(form.status)) {
-      return res.status(400).json({ message: `Cannot update a ${form.status} submission.` });
+    if (form.status !== 'pending') {
+      return res.status(400).json({ message: `Cannot ship a label for a submission that is already ${form.status}.` });
     }
 
-    const { bidPrice, uspsLabelNumber } = req.body;
-    if (bidPrice === undefined || bidPrice === null || bidPrice === '') {
-      return res.status(400).json({ message: "Counter offer amount is required" });
+    const { uspsLabelNumber } = req.body;
+    if (!uspsLabelNumber) {
+      return res.status(400).json({ message: "USPS tracking number is required" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "USPS label PDF is required" });
     }
 
-    // Label PDF (optional on this call if one was already uploaded earlier —
-    // e.g. admin is only correcting the price).
-    if (req.file) {
-      const uploaded = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "shipping-labels", resource_type: "raw", format: "pdf" },
-          (err, result) => (err ? reject(err) : resolve(result))
-        );
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
-      // Cloudinary blocks public delivery of PDF/raw files by default (a
-      // security restriction most accounts ship with) — uploaded.secure_url
-      // 401s, and even a signed delivery URL doesn't bypass it. The Admin
-      // API's "private download" link does: it's a separate, authenticated
-      // download endpoint made exactly for this. Note: for resource_type
-      // "raw", Cloudinary's own public_id already includes the extension —
-      // don't pass a `format` on top of it or the signature won't match.
-      form.uspsLabelUrl = cloudinary.utils.private_download_url(uploaded.public_id, "", {
-        resource_type: "raw",
-        type: "upload",
-        api_key: process.env.CLOUD_API_KEY,
-        api_secret: process.env.CLOUD_API_SECRET,
-      });
-    }
-    if (uspsLabelNumber) form.uspsLabelNumber = uspsLabelNumber;
-
-    form.bidPrice = Number(bidPrice);
-    form.status = 'bid_placed';
-
-    const matchesEstimate = Number(bidPrice) === Number(form.estimatedPrice);
-    let emailJob = null;
-
-    if (matchesEstimate) {
-      form.counterOfferStatus = 'matches_estimate';
-      form.counterOfferToken = undefined;
-      emailJob = { kind: 'confirmed' };
-    } else {
-      form.counterOfferStatus = 'pending_acceptance';
-      form.counterOfferToken = crypto.randomBytes(24).toString('hex');
-      emailJob = { kind: 'proposal' };
-    }
+    const uploaded = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "shipping-labels", resource_type: "raw", format: "pdf" },
+        (err, result) => (err ? reject(err) : resolve(result))
+      );
+      streamifier.createReadStream(req.file.buffer).pipe(stream);
+    });
+    // Cloudinary blocks public delivery of PDF/raw files by default (a
+    // security restriction most accounts ship with) — uploaded.secure_url
+    // 401s, and even a signed delivery URL doesn't bypass it. The Admin
+    // API's "private download" link does: it's a separate, authenticated
+    // download endpoint made exactly for this. Note: for resource_type
+    // "raw", Cloudinary's own public_id already includes the extension —
+    // don't pass a `format` on top of it or the signature won't match.
+    form.uspsLabelUrl = cloudinary.utils.private_download_url(uploaded.public_id, "", {
+      resource_type: "raw",
+      type: "upload",
+      api_key: process.env.CLOUD_API_KEY,
+      api_secret: process.env.CLOUD_API_SECRET,
+    });
+    form.uspsLabelNumber = uspsLabelNumber;
+    form.status = 'in_transit';
 
     await form.save();
     await form.populate('mobileId');
@@ -513,38 +512,168 @@ export const setCounterOffer = async (req, res) => {
 
     res.json(form);
 
-    // Fire-and-forget email
     const email = form.pickUpDetails?.email || form.userId?.email;
     if (email) {
       const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-      const name = form.pickUpDetails?.fullName;
+      const html = getLabelSentTemplate(form.pickUpDetails?.fullName, deviceName, form.estimatedPrice, {
+        labelUrl: form.uspsLabelUrl,
+        labelNumber: form.uspsLabelNumber,
+        trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
+      });
+      sendEmail({
+        email,
+        subject: 'Your CashMish Shipping Label Is Ready',
+        html,
+      }).catch((err) => console.error("📧 Non-blocking email error (Label Sent):", err.message));
+    }
+  } catch (error) {
+    console.error("❌ Ship label error:", error);
+    res.status(500).json({ message: "Failed to ship label", error: error.message });
+  }
+};
 
-      let subject, html;
-      if (emailJob.kind === 'confirmed') {
-        subject = 'Your CashMish Price Is Confirmed';
-        html = getPaymentConfirmedTemplate(name, deviceName, form.bidPrice, {
-          labelUrl: form.uspsLabelUrl,
-          labelNumber: form.uspsLabelNumber,
-          trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
-        });
-      } else {
-        subject = 'A Counter Offer for Your Device - CashMish';
-        html = getCounterOfferProposalTemplate(
-          name,
-          deviceName,
-          form.estimatedPrice,
-          form.bidPrice,
-          `${FRONTEND_URL}/offer/${form.counterOfferToken}`
-        );
-      }
+// ── Admin, stage 2: mark the device as physically received. ────────────────
+export const markReceived = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
 
-      sendEmail({ email, subject, html }).catch((err) =>
-        console.error("📧 Non-blocking email error (Counter Offer):", err.message)
+    if (form.status !== 'in_transit') {
+      return res.status(400).json({ message: `Cannot mark received — submission is ${form.status}, not in_transit.` });
+    }
+
+    form.status = 'received';
+    await form.save();
+    await form.populate('mobileId');
+    await form.populate('userId', 'name email phoneNumber');
+
+    res.json(form);
+  } catch (error) {
+    console.error("❌ Mark received error:", error);
+    res.status(500).json({ message: "Failed to mark as received", error: error.message });
+  }
+};
+
+// ── Admin, stage 3a: device matches exactly what the customer declared —
+// pay them the original estimate directly, no counter offer needed.
+export const confirmMatchAndPay = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
+
+    if (form.status !== 'received') {
+      return res.status(400).json({ message: `Submission must be marked received first (currently ${form.status}).` });
+    }
+
+    form.bidPrice = form.estimatedPrice;
+    form.counterOfferStatus = 'matches_estimate';
+    form.status = 'paid';
+    await form.save();
+    await form.populate('mobileId');
+    await form.populate('userId', 'name email phoneNumber');
+
+    res.json(form);
+
+    const email = form.pickUpDetails?.email || form.userId?.email;
+    if (email) {
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+      const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
+      sendEmail({
+        email,
+        subject: 'Payment Sent - CashMish',
+        html,
+      }).catch((err) => console.error("📧 Non-blocking email error (Payment Sent):", err.message));
+    }
+  } catch (error) {
+    console.error("❌ Confirm match & pay error:", error);
+    res.status(500).json({ message: "Failed to confirm and pay", error: error.message });
+  }
+};
+
+// ── Admin, stage 3b: device doesn't match what was declared — send a
+// reasoned counter offer the customer must accept before anything is paid.
+export const setCounterOffer = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
+
+    if (form.status !== 'received') {
+      return res.status(400).json({ message: `Submission must be marked received first (currently ${form.status}).` });
+    }
+
+    const { bidPrice, reason } = req.body;
+    if (bidPrice === undefined || bidPrice === null || bidPrice === '') {
+      return res.status(400).json({ message: "Counter offer amount is required" });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ message: "A reason for the counter offer is required" });
+    }
+
+    form.bidPrice = Number(bidPrice);
+    form.counterOfferReason = reason.trim();
+    form.counterOfferStatus = 'pending_acceptance';
+    form.counterOfferToken = crypto.randomBytes(24).toString('hex');
+
+    await form.save();
+    await form.populate('mobileId');
+    await form.populate('userId', 'name email phoneNumber');
+
+    res.json(form);
+
+    const email = form.pickUpDetails?.email || form.userId?.email;
+    if (email) {
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+      const html = getCounterOfferProposalTemplate(
+        form.pickUpDetails?.fullName,
+        deviceName,
+        form.estimatedPrice,
+        form.bidPrice,
+        form.counterOfferReason,
+        `${FRONTEND_URL}/offer/${form.counterOfferToken}`
       );
+      sendEmail({
+        email,
+        subject: 'A Counter Offer for Your Device - CashMish',
+        html,
+      }).catch((err) => console.error("📧 Non-blocking email error (Counter Offer):", err.message));
     }
   } catch (error) {
     console.error("❌ Set counter offer error:", error);
     res.status(500).json({ message: "Failed to set counter offer", error: error.message });
+  }
+};
+
+// ── Admin, stage 4: after a counter offer was accepted and the admin has
+// actually sent the money (Zelle/bank, outside this system), record it.
+export const markPaid = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
+
+    if (form.status !== 'accepted') {
+      return res.status(400).json({ message: `Submission must be accepted by the customer first (currently ${form.status}).` });
+    }
+
+    form.status = 'paid';
+    await form.save();
+    await form.populate('mobileId');
+    await form.populate('userId', 'name email phoneNumber');
+
+    res.json(form);
+
+    const email = form.pickUpDetails?.email || form.userId?.email;
+    if (email) {
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+      const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
+      sendEmail({
+        email,
+        subject: 'Payment Sent - CashMish',
+        html,
+      }).catch((err) => console.error("📧 Non-blocking email error (Payment Sent):", err.message));
+    }
+  } catch (error) {
+    console.error("❌ Mark paid error:", error);
+    res.status(500).json({ message: "Failed to mark as paid", error: error.message });
   }
 };
 
@@ -559,6 +688,7 @@ export const getOfferByToken = async (req, res) => {
       storage: form.storage,
       estimatedPrice: form.estimatedPrice,
       counterOfferPrice: form.bidPrice,
+      reason: form.counterOfferReason,
       status: form.counterOfferStatus,
       fullName: form.pickUpDetails?.fullName,
     });
@@ -569,6 +699,8 @@ export const getOfferByToken = async (req, res) => {
 };
 
 // ── Public: customer accepts a differing counter offer via the emailed link.
+// Marks it accepted — actual payment (and its confirmation email) happens
+// separately once the admin has sent the money and calls markPaid.
 export const acceptCounterOffer = async (req, res) => {
   try {
     const form = await Form.findOne({ counterOfferToken: req.params.token });
@@ -596,21 +728,6 @@ export const acceptCounterOffer = async (req, res) => {
 
     await form.populate('mobileId');
     res.json({ message: "Counter offer accepted" });
-
-    const email = form.pickUpDetails?.email;
-    if (email) {
-      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-      const html = getPaymentConfirmedTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, {
-        labelUrl: form.uspsLabelUrl,
-        labelNumber: form.uspsLabelNumber,
-        trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
-      });
-      sendEmail({
-        email,
-        subject: 'Your CashMish Price Is Confirmed',
-        html,
-      }).catch((err) => console.error("📧 Non-blocking email error (Offer Accepted):", err.message));
-    }
   } catch (error) {
     console.error("❌ Accept counter offer error:", error);
     res.status(500).json({ message: "Failed to accept offer" });
