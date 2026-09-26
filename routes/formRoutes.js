@@ -15,6 +15,7 @@ import {
   markReceived,
   confirmMatchAndPay,
   setCounterOffer,
+  resendCounterOfferEmail,
   markPaid,
   getOfferByToken,
   acceptCounterOffer,
@@ -54,6 +55,7 @@ router.put("/:id/ship-label", requireAuth, uploadLabel.single("label"), shipLabe
 router.put("/:id/mark-received", requireAuth, markReceived);
 router.put("/:id/confirm-paid", requireAuth, confirmMatchAndPay);
 router.put("/:id/counter-offer", requireAuth, setCounterOffer);
+router.put("/:id/resend-counter-offer", requireAuth, resendCounterOfferEmail);
 router.put("/:id/mark-paid", requireAuth, markPaid);
 router.put("/:id/ack-acceptance", requireAuth, ackAcceptance);
 

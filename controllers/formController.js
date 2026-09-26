@@ -600,6 +600,30 @@ export const confirmMatchAndPay = async (req, res) => {
 
 // ── Admin, stage 3b: device doesn't match what was declared — send a
 // reasoned counter offer the customer must accept before anything is paid.
+// Shared by setCounterOffer (after a real change) and resendCounterOfferEmail
+// (no change, just retrying delivery) — never mutates the form.
+const sendCounterOfferEmail = async (form) => {
+  const email = form.pickUpDetails?.email || form.userId?.email;
+  if (!email) return { emailSent: false, emailError: 'No email address on file' };
+
+  try {
+    const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+    const html = getCounterOfferProposalTemplate(
+      form.pickUpDetails?.fullName,
+      deviceName,
+      form.estimatedPrice,
+      form.bidPrice,
+      form.counterOfferReason,
+      `${FRONTEND_URL}/offer/${form.counterOfferToken}`
+    );
+    await sendEmail({ email, subject: 'A Counter Offer for Your Device - CashMish', html });
+    return { emailSent: true, emailError: null };
+  } catch (err) {
+    console.error("📧 Email error (Counter Offer):", err.message);
+    return { emailSent: false, emailError: err.message };
+  }
+};
+
 export const setCounterOffer = async (req, res) => {
   try {
     const form = await Form.findById(req.params.id);
@@ -617,40 +641,49 @@ export const setCounterOffer = async (req, res) => {
       return res.status(400).json({ message: "A reason for the counter offer is required" });
     }
 
+    // Only mint a new token (which invalidates any link already emailed) if
+    // the offer is actually changing — calling this again with identical
+    // values should never silently break a link the customer already has.
+    const isUnchanged = form.counterOfferToken
+      && Number(form.bidPrice) === Number(bidPrice)
+      && form.counterOfferReason === reason.trim();
+
     form.bidPrice = Number(bidPrice);
     form.counterOfferReason = reason.trim();
     form.counterOfferStatus = 'pending_acceptance';
-    form.counterOfferToken = crypto.randomBytes(24).toString('hex');
+    if (!isUnchanged) {
+      form.counterOfferToken = crypto.randomBytes(24).toString('hex');
+    }
 
     await form.save();
     await form.populate('mobileId');
     await form.populate('userId', 'name email phoneNumber');
 
-    let emailSent = false, emailError = null;
-    const email = form.pickUpDetails?.email || form.userId?.email;
-    if (email) {
-      try {
-        const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
-        const html = getCounterOfferProposalTemplate(
-          form.pickUpDetails?.fullName,
-          deviceName,
-          form.estimatedPrice,
-          form.bidPrice,
-          form.counterOfferReason,
-          `${FRONTEND_URL}/offer/${form.counterOfferToken}`
-        );
-        await sendEmail({ email, subject: 'A Counter Offer for Your Device - CashMish', html });
-        emailSent = true;
-      } catch (err) {
-        console.error("📧 Email error (Counter Offer):", err.message);
-        emailError = err.message;
-      }
-    }
-
+    const { emailSent, emailError } = await sendCounterOfferEmail(form);
     res.json({ ...form.toObject(), emailSent, emailError });
   } catch (error) {
     console.error("❌ Set counter offer error:", error);
     res.status(500).json({ message: "Failed to set counter offer", error: error.message });
+  }
+};
+
+// ── Admin: re-send the counter-offer email exactly as-is — no data changes,
+// so the link the customer already has (if any) keeps working. For when the
+// first send failed to deliver.
+export const resendCounterOfferEmail = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id).populate('mobileId').populate('userId', 'name email phoneNumber');
+    if (!form) return res.status(404).json({ message: "Form not found" });
+
+    if (form.counterOfferStatus !== 'pending_acceptance' || !form.counterOfferToken) {
+      return res.status(400).json({ message: "There's no pending counter offer to resend for this submission." });
+    }
+
+    const { emailSent, emailError } = await sendCounterOfferEmail(form);
+    res.json({ ...form.toObject(), emailSent, emailError });
+  } catch (error) {
+    console.error("❌ Resend counter offer error:", error);
+    res.status(500).json({ message: "Failed to resend", error: error.message });
   }
 };
 
