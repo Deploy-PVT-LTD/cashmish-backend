@@ -47,7 +47,7 @@ const LOGO_URL = 'https://res.cloudinary.com/duc5zvcho/image/upload/v1790419971/
 
 const brandedHeader = () => `
   <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #f1f1f1;">
-    <img src="${LOGO_URL}" alt="CashMish" height="36" style="height: 36px; display: inline-block;" />
+    <img src="${LOGO_URL}" alt="CashMish" height="56" style="height: 56px; display: inline-block;" />
   </div>
 `;
 
