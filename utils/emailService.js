@@ -43,8 +43,7 @@ export const sendEmail = async (options) => {
 // Public site + logo used in the newer, branded templates below (SVG renders
 // fine in Gmail/Apple Mail; the "CashMish" text alt/heading covers Outlook,
 // which doesn't render SVG in emails).
-const SITE_URL = 'https://cashmish.com';
-const LOGO_URL = `${SITE_URL}/logo.svg`;
+const LOGO_URL = 'https://res.cloudinary.com/duc5zvcho/image/upload/v1790419971/branding/cashmish-logo-email.png';
 
 const brandedHeader = () => `
   <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #f1f1f1;">
@@ -103,9 +102,7 @@ export const getResetPasswordTemplate = (resetUrl, userName) => {
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>CashMish</h1>
-        </div>
+        ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'User'},</p>
           <p>You are receiving this email because you (or someone else) have requested the reset of the password for your account.</p>
@@ -180,9 +177,7 @@ export const getFormConfirmationTemplate = (userName, deviceName, estimatedPrice
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>CashMish</h1>
-        </div>
+        ${brandedHeader()}
         <div class="content">
           <div style="text-align: center;">
             <div class="success-badge">Submission Successful!</div>
@@ -268,9 +263,7 @@ export const getBidStatusTemplate = (userName, deviceName, status, bidPrice) => 
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>CashMish</h1>
-        </div>
+        ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'User'},</p>
           <p>Your trade-in request for <strong>${deviceName}</strong> has been reviewed by our team.</p>
@@ -370,9 +363,7 @@ export const getAdminBidOfferTemplate = (userName, deviceName, bidPrice, formId)
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>CashMish</h1>
-        </div>
+        ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'User'},</p>
           <p>We have reviewed your request for <strong>${deviceName}</strong>. Based on the conditions provided, we have a counter-offer for you:</p>
@@ -447,9 +438,7 @@ export const getAcceptPriceTemplate = (userName, deviceName, price) => {
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>CashMish</h1>
-        </div>
+        ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'User'},</p>
           <p>Great news! We have accepted your price for <strong>${deviceName}</strong>.</p>
@@ -518,9 +507,7 @@ export const getPayoutSentTemplate = (userName, amount) => {
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>CashMish</h1>
-        </div>
+        ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'User'},</p>
           <p>Great news! Your payment has been processed and sent to your bank account.</p>
