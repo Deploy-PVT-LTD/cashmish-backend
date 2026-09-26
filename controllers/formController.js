@@ -475,7 +475,19 @@ export const setCounterOffer = async (req, res) => {
         );
         streamifier.createReadStream(req.file.buffer).pipe(stream);
       });
-      form.uspsLabelUrl = uploaded.secure_url;
+      // Cloudinary blocks public delivery of PDF/raw files by default (a
+      // security restriction most accounts ship with) — uploaded.secure_url
+      // 401s, and even a signed delivery URL doesn't bypass it. The Admin
+      // API's "private download" link does: it's a separate, authenticated
+      // download endpoint made exactly for this. Note: for resource_type
+      // "raw", Cloudinary's own public_id already includes the extension —
+      // don't pass a `format` on top of it or the signature won't match.
+      form.uspsLabelUrl = cloudinary.utils.private_download_url(uploaded.public_id, "", {
+        resource_type: "raw",
+        type: "upload",
+        api_key: process.env.CLOUD_API_KEY,
+        api_secret: process.env.CLOUD_API_SECRET,
+      });
     }
     if (uspsLabelNumber) form.uspsLabelNumber = uspsLabelNumber;
 
@@ -512,6 +524,7 @@ export const setCounterOffer = async (req, res) => {
         subject = 'Your CashMish Price Is Confirmed';
         html = getPaymentConfirmedTemplate(name, deviceName, form.bidPrice, {
           labelUrl: form.uspsLabelUrl,
+          labelNumber: form.uspsLabelNumber,
           trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
         });
       } else {
@@ -589,6 +602,7 @@ export const acceptCounterOffer = async (req, res) => {
       const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
       const html = getPaymentConfirmedTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, {
         labelUrl: form.uspsLabelUrl,
+        labelNumber: form.uspsLabelNumber,
         trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
       });
       sendEmail({

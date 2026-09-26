@@ -546,7 +546,7 @@ export const getPayoutSentTemplate = (userName, amount) => {
 // Sent the moment a price is confirmed for the customer to receive — either
 // the admin's counter offer exactly matched the system estimate, or the
 // customer just accepted a differing counter offer via the email below.
-export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labelUrl, trackingUrl } = {}) => {
+export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labelUrl, labelNumber, trackingUrl } = {}) => {
   return `
     <!DOCTYPE html>
     <html>
@@ -572,6 +572,7 @@ export const getPaymentConfirmedTemplate = (userName, deviceName, amount, { labe
           <div class="price-box">$ ${amount}</div>
           <div class="details-box">
             <p style="margin: 0;">📦 Use the attached prepaid USPS label to ship your device to us — it's free.</p>
+            ${labelNumber ? `<p style="margin-top: 10px;">🔖 USPS Tracking Number: <strong>${labelNumber}</strong></p>` : ''}
             <p style="margin-top: 10px;">💰 You'll receive your payment <strong>within 48 hours of us receiving your device</strong>.</p>
           </div>
           ${(labelUrl || trackingUrl) ? `
