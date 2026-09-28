@@ -553,8 +553,7 @@ export const getLabelSentTemplate = (userName, deviceName, estimatedPrice, { lab
         ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'there'},</p>
-          <p>Your shipping label for <strong>${deviceName}</strong> is ready. Based on the condition you described, here's what you're on track to receive:</p>
-          <div class="price-box">$ ${estimatedPrice}</div>
+          <p>Your shipping label for <strong>${deviceName}</strong> is ready. Based on the condition you described, you're on track to receive <strong>$${estimatedPrice}</strong>.</p>
           <div class="details-box">
             <p style="margin: 0;">📦 Use the attached prepaid USPS label to ship your device to us — it's free.</p>
             ${labelNumber ? `<p style="margin-top: 10px;">🔖 USPS Tracking Number: <strong>${labelNumber}</strong></p>` : ''}
@@ -639,8 +638,7 @@ export const getPaymentSentTemplate = (userName, deviceName, amount, paymentMeth
         ${brandedHeader()}
         <div class="content">
           <p>Hello ${userName || 'there'},</p>
-          <p>Great news — your payment for <strong>${deviceName}</strong> has been sent to ${methodText}:</p>
-          <div class="price-box">$ ${amount}</div>
+          <p>Great news — your payment of <strong>$${amount}</strong> for <strong>${deviceName}</strong> has been sent to ${methodText}.</p>
           <p>It may take a little time to reflect depending on your bank/Zelle's processing time.</p>
           <p>Thank you for choosing CashMish!</p>
         </div>
