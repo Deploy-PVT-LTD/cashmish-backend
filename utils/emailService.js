@@ -179,9 +179,6 @@ export const getFormConfirmationTemplate = (userName, deviceName, estimatedPrice
       <div class="container">
         ${brandedHeader()}
         <div class="content">
-          <div style="text-align: center;">
-            <div class="success-badge">Submission Successful!</div>
-          </div>
           <p>Hello ${userName || 'User'},</p>
           <p>Thank you for choosing CashMish! We have successfully received your request for selling your device.</p>
           <p>Our team will contact you soon to coordinate the next steps.</p>
