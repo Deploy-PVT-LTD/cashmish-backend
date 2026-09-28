@@ -227,7 +227,7 @@ export const createForm = async (req, res) => {
 
       sendEmail({
         email: form.pickUpDetails.email,
-        subject: 'Form Submission Confirmation - CashMish',
+        subject: 'CashMish — Device Sale Request Received',
         html,
       }).catch(err => console.error("📧 Non-blocking email error (Confirmation):", err.message));
 
@@ -387,7 +387,7 @@ export const updateForm = async (req, res) => {
       const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
 
       if (bidUpdated && (!req.body.status || req.body.status === 'pending' || req.body.status === 'bid_placed')) {
-        subject = 'New Bid Offer for Your Device - CashMish';
+        subject = 'CashMish — Counter Offer for Your Device';
         html = getAdminBidOfferTemplate(
           form.pickUpDetails.fullName,
           deviceName,
@@ -396,7 +396,7 @@ export const updateForm = async (req, res) => {
         );
         smsText = getAdminBidOfferSMS(form.pickUpDetails.fullName, deviceName, req.body.bidPrice);
       } else if (req.body.status === 'accepted' && statusChanged) {
-        subject = 'Trade-in Price Accepted - CashMish';
+        subject = 'CashMish — Trade-In Price Accepted';
         html = getAcceptPriceTemplate(
           form.pickUpDetails.fullName,
           deviceName,
@@ -404,7 +404,7 @@ export const updateForm = async (req, res) => {
         );
         smsText = getAcceptPriceSMS(form.pickUpDetails.fullName, deviceName, form.bidPrice || form.estimatedPrice);
       } else if (req.body.status === 'rejected' && statusChanged) {
-        subject = 'Trade-in Request Status Update - CashMish';
+        subject = 'CashMish — Submission Status Update';
         html = getBidStatusTemplate(
           form.pickUpDetails.fullName,
           deviceName,
@@ -522,7 +522,7 @@ export const shipLabel = async (req, res) => {
           labelNumber: form.uspsLabelNumber,
           trackingUrl: uspsTrackingUrl(form.uspsLabelNumber),
         });
-        await sendEmail({ email, subject: 'Your CashMish Shipping Label Is Ready', html });
+        await sendEmail({ email, subject: 'CashMish — Shipping Label & Estimated Offer', html });
         emailSent = true;
       } catch (err) {
         console.error("📧 Email error (Label Sent):", err.message);
@@ -583,7 +583,7 @@ export const confirmMatchAndPay = async (req, res) => {
       try {
         const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
         const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
-        await sendEmail({ email, subject: 'Payment Sent - CashMish', html });
+        await sendEmail({ email, subject: 'CashMish — Payment Sent', html });
         emailSent = true;
       } catch (err) {
         console.error("📧 Email error (Payment Sent):", err.message);
@@ -616,7 +616,7 @@ const sendCounterOfferEmail = async (form) => {
       form.counterOfferReason,
       `${FRONTEND_URL}/offer/${form.counterOfferToken}`
     );
-    await sendEmail({ email, subject: 'A Counter Offer for Your Device - CashMish', html });
+    await sendEmail({ email, subject: 'CashMish — Revised Offer for Your Device', html });
     return { emailSent: true, emailError: null };
   } catch (err) {
     console.error("📧 Email error (Counter Offer):", err.message);
@@ -709,7 +709,7 @@ export const markPaid = async (req, res) => {
       try {
         const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
         const html = getPaymentSentTemplate(form.pickUpDetails?.fullName, deviceName, form.bidPrice, form.paymentMethod);
-        await sendEmail({ email, subject: 'Payment Sent - CashMish', html });
+        await sendEmail({ email, subject: 'CashMish — Payment Sent', html });
         emailSent = true;
       } catch (err) {
         console.error("📧 Email error (Payment Sent):", err.message);

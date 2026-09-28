@@ -156,7 +156,7 @@ export const forgotPassword = async (req, res) => {
       console.log(`[DEBUG] Calling sendEmail for ${user.email}`);
       await sendEmail({
         email: user.email,
-        subject: 'Password Reset Request',
+        subject: 'CashMish — Password Reset Request',
         html: html,
       });
       console.log(`[DEBUG] Email send promise resolved`);

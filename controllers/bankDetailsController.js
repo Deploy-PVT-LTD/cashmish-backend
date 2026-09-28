@@ -81,7 +81,7 @@ export const updateBankDetails = async (req, res) => {
 
         // ✅ Send Payout Confirmation Email + SMS in background (fire-and-forget)
         if (status === 'paid' && oldDetails.status !== 'paid') {
-            const subject = 'Payment Processed - CashMish';
+            const subject = 'CashMish — Payment Processed';
             const html = getPayoutSentTemplate(
                 bankDetails.userId.name,
                 bankDetails.amount
