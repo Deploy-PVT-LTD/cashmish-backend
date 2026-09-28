@@ -569,6 +569,9 @@ export const confirmMatchAndPay = async (req, res) => {
     if (form.status !== 'received') {
       return res.status(400).json({ message: `Submission must be marked received first (currently ${form.status}).` });
     }
+    if (form.counterOfferStatus === 'pending_acceptance') {
+      return res.status(400).json({ message: "A counter offer is already pending the customer's acceptance for this submission — wait for them to accept (or resend/revise it) instead of paying the original estimate." });
+    }
 
     form.bidPrice = form.estimatedPrice;
     form.counterOfferStatus = 'matches_estimate';
