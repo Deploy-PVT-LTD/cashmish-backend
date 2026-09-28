@@ -640,6 +640,15 @@ export const setCounterOffer = async (req, res) => {
     if (bidPrice === undefined || bidPrice === null || bidPrice === '') {
       return res.status(400).json({ message: "Counter offer amount is required" });
     }
+    const bidPriceNum = Number(bidPrice);
+    if (!(bidPriceNum > 0)) {
+      return res.status(400).json({ message: "Counter offer must be greater than 0" });
+    }
+    // A counter offer only makes sense as a reduction — matching or beating
+    // the estimate is what confirm-and-pay is for, not a counter offer.
+    if (bidPriceNum >= form.estimatedPrice) {
+      return res.status(400).json({ message: `Counter offer must be less than the estimated price ($${form.estimatedPrice})` });
+    }
     if (!reason || !reason.trim()) {
       return res.status(400).json({ message: "A reason for the counter offer is required" });
     }
