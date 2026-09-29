@@ -18,7 +18,8 @@ import {
   getAcceptPriceTemplate,
   getLabelSentTemplate,
   getPaymentSentTemplate,
-  getCounterOfferProposalTemplate
+  getCounterOfferProposalTemplate,
+  getOfferRejectedTemplate
 } from "../utils/emailService.js";
 import {
   sendSMS,
@@ -768,6 +769,9 @@ export const acceptCounterOffer = async (req, res) => {
     if (form.counterOfferStatus === 'accepted') {
       return res.json({ message: "Already accepted", alreadyAccepted: true });
     }
+    if (form.counterOfferStatus === 'rejected') {
+      return res.status(400).json({ message: "This offer was already declined and can't be accepted now." });
+    }
 
     form.status = 'accepted';
     form.counterOfferStatus = 'accepted';
@@ -790,6 +794,64 @@ export const acceptCounterOffer = async (req, res) => {
   } catch (error) {
     console.error("❌ Accept counter offer error:", error);
     res.status(500).json({ message: "Failed to accept offer" });
+  }
+};
+
+// ── Public: customer rejects a differing counter offer via the emailed link.
+// The device gets shipped back to them — status moves to 'return' so the
+// admin knows to send it, separate from 'returned' once they actually have.
+export const rejectCounterOffer = async (req, res) => {
+  try {
+    const form = await Form.findOne({ counterOfferToken: req.params.token }).populate('mobileId');
+    if (!form) return res.status(404).json({ message: "Offer not found or already resolved" });
+
+    if (form.counterOfferStatus === 'rejected' || form.counterOfferStatus === 'accepted') {
+      return res.json({ message: "Already resolved", alreadyResolved: true, status: form.counterOfferStatus });
+    }
+
+    form.status = 'return';
+    form.counterOfferStatus = 'rejected';
+    form.counterOfferRespondedAt = new Date();
+    form.acceptanceSeenByAdmin = false; // reuse the same "needs admin attention" flag for this too
+    await form.save();
+
+    res.json({ message: "Counter offer rejected" });
+
+    const email = form.pickUpDetails?.email;
+    if (email) {
+      const deviceName = `${form.mobileId.brand} ${form.mobileId.phoneModel}`;
+      const html = getOfferRejectedTemplate(form.pickUpDetails?.fullName, deviceName);
+      sendEmail({
+        email,
+        subject: 'CashMish — Offer Declined, Device Being Returned',
+        html,
+      }).catch((err) => console.error("📧 Non-blocking email error (Offer Rejected):", err.message));
+    }
+  } catch (error) {
+    console.error("❌ Reject counter offer error:", error);
+    res.status(500).json({ message: "Failed to reject offer" });
+  }
+};
+
+// ── Admin: mark a rejected-offer device as actually shipped back. ──────────
+export const markReturned = async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form) return res.status(404).json({ message: "Form not found" });
+
+    if (form.status !== 'return') {
+      return res.status(400).json({ message: `Submission is ${form.status}, not awaiting return.` });
+    }
+
+    form.status = 'returned';
+    await form.save();
+    await form.populate('mobileId');
+    await form.populate('userId', 'name email phoneNumber');
+
+    res.json(form);
+  } catch (error) {
+    console.error("❌ Mark returned error:", error);
+    res.status(500).json({ message: "Failed to mark as returned", error: error.message });
   }
 };
 

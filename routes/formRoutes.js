@@ -19,6 +19,8 @@ import {
   markPaid,
   getOfferByToken,
   acceptCounterOffer,
+  rejectCounterOffer,
+  markReturned,
   ackAcceptance,
 } from "../controllers/formController.js";
 import upload from "../middleware/upload.js";
@@ -34,6 +36,7 @@ router.post("/estimate", getEstimate);
 // Public — reached via the "accept this counter offer" email link, no login.
 router.get("/offer/:token", getOfferByToken);
 router.post("/offer/:token/accept", acceptCounterOffer);
+router.post("/offer/:token/reject", rejectCounterOffer);
 const upload15 = upload.array("images", 15);
 router.post("/", (req, res, next) => {
   upload15(req, res, function (err) {
@@ -57,6 +60,7 @@ router.put("/:id/confirm-paid", requireAuth, confirmMatchAndPay);
 router.put("/:id/counter-offer", requireAuth, setCounterOffer);
 router.put("/:id/resend-counter-offer", requireAuth, resendCounterOfferEmail);
 router.put("/:id/mark-paid", requireAuth, markPaid);
+router.put("/:id/mark-returned", requireAuth, markReturned);
 router.put("/:id/ack-acceptance", requireAuth, ackAcceptance);
 
 router.get("/:id", getFormById);

@@ -579,7 +579,7 @@ export const getLabelSentTemplate = (userName, deviceName, estimatedPrice, { lab
 // up a mismatch with what the customer declared. Always includes the reason
 // so the customer understands exactly why the offer changed, and must
 // actively accept it (no login, just this link) before anything is paid.
-export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedPrice, counterOfferPrice, reason, acceptUrl) => {
+export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedPrice, counterOfferPrice, reason, offerUrl) => {
   return `
     <!DOCTYPE html>
     <html>
@@ -590,8 +590,9 @@ export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedP
         .reason-box { background-color: #fdf2e9; border-left: 4px solid #e67e22; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .offer-box { background-color: #f1c40f; color: #2c3e50; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; font-weight: bold; font-size: 22px; }
         .button-group { text-align: center; margin: 30px 0; }
-        .button { padding: 14px 32px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; }
+        .button { padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin: 6px; }
         .btn-accept { background-color: #27ae60; color: white !important; }
+        .btn-reject { background-color: #e74c3c; color: white !important; }
         .footer { text-align: center; font-size: 12px; color: #95a5a6; margin-top: 30px; }
       </style>
     </head>
@@ -605,11 +606,44 @@ export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedP
           <p>Because of this, we're offering you a revised price instead of the original estimate:</p>
           <div class="offer-box">Counter Offer: $ ${counterOfferPrice}</div>
           <p style="text-align: center; color: #7f8c8d; font-size: 14px;">(Original estimate was $ ${estimatedPrice})</p>
-          <p style="text-align: center;">If you accept, you'll receive this payment shortly after:</p>
+          <p style="text-align: center;">If you accept, you'll receive this payment shortly after. If you'd rather not, you can decline and we'll ship your device back to you.</p>
           <div class="button-group">
-            <a href="${acceptUrl}" class="button btn-accept">Accept Counter Offer</a>
+            <a href="${offerUrl}" class="button btn-accept">Accept Counter Offer</a>
+            <a href="${offerUrl}" class="button btn-reject">Reject Offer</a>
           </div>
           <p style="font-size: 13px; color: #7f8c8d;">If you have any questions about this offer, just reply to this email.</p>
+        </div>
+        <div class="footer"><p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p></div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+// Sent when the customer declines a counter offer — confirms their device
+// is being shipped back to them rather than purchased.
+export const getOfferRejectedTemplate = (userName, deviceName) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff; }
+        .content { color: #34495e; line-height: 1.6; margin-top: 20px; }
+        .details-box { background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .footer { text-align: center; font-size: 12px; color: #95a5a6; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${brandedHeader()}
+        <div class="content">
+          <p>Hello ${userName || 'there'},</p>
+          <p>We've noted that you've declined our revised offer for <strong>${deviceName}</strong>.</p>
+          <div class="details-box">
+            <p style="margin: 0;">📦 Your device will be shipped back to you within <strong>4–5 working days</strong>.</p>
+          </div>
+          <p>No further action is needed on your end. Thank you for considering CashMish!</p>
         </div>
         <div class="footer"><p>&copy; ${new Date().getFullYear()} CashMish. All rights reserved.</p></div>
       </div>

@@ -13,16 +13,24 @@ const formSchema = new mongoose.Schema(
       phoneNumber: { type: String, required: true },
       email: { type: String, required: true },
       address: {
+        // Full string kept for display/back-compat (emails, admin views that
+        // just print one line) — computed from the structured fields below.
         addressText: { type: String, required: true },
+        street: { type: String },
+        city: { type: String },
+        state: { type: String },
+        zipCode: { type: String },
         location: {
           type: {
             type: String,
             enum: ["Point"],
             default: "Point",
           },
+          // No longer guaranteed — structured entry doesn't geocode unless
+          // "use my location" was used, so this isn't required any more.
           coordinates: {
             type: [Number],
-            required: true,
+            default: [0, 0],
           },
         },
       },
@@ -101,9 +109,10 @@ const formSchema = new mongoose.Schema(
     // 'pending_acceptance' — admin's price differs; waiting on the customer to
     //   accept via the emailed link.
     // 'accepted' — customer accepted a differing counter offer.
+    // 'rejected' — customer declined it; the device is shipped back to them.
     counterOfferStatus: {
       type: String,
-      enum: ["none", "matches_estimate", "pending_acceptance", "accepted"],
+      enum: ["none", "matches_estimate", "pending_acceptance", "accepted", "rejected"],
       default: "none",
     },
     // Secret token embedded in the "accept this offer" email link — looked up
