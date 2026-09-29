@@ -609,7 +609,7 @@ export const getCounterOfferProposalTemplate = (userName, deviceName, estimatedP
           <p style="text-align: center;">If you accept, you'll receive this payment shortly after. If you'd rather not, you can decline and we'll ship your device back to you.</p>
           <div class="button-group">
             <a href="${offerUrl}" class="button btn-accept">Accept Counter Offer</a>
-            <a href="${offerUrl}" class="button btn-reject">Reject Offer</a>
+            <a href="${offerUrl}?intent=reject" class="button btn-reject">Reject Offer</a>
           </div>
           <p style="font-size: 13px; color: #7f8c8d;">If you have any questions about this offer, just reply to this email.</p>
         </div>
