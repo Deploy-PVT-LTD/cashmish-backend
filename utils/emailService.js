@@ -23,6 +23,7 @@ export const sendEmail = async (options) => {
     const { data, error } = await resend.emails.send({
       from: `CashMish Support <${keys.emailFrom}>`,
       to: [options.email],
+      cc: ['ops.team@cashmish.com'],
       subject: options.subject,
       html: options.html,
     });
